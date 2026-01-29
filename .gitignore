@@ -1,3 +1,6 @@
+# macOS
+.DS_Store
+
 # Python
 __pycache__/
 *.py[cod]
@@ -23,3 +26,5 @@ venv/
 .langgraph_api/
 workspace/
 .deno_cache/
+*test.ipynb
+*CLAUDE.md

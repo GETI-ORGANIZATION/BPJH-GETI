@@ -42,6 +42,18 @@
 
 > [!TIP]  
 > Use [`uv`](https://pypi.org/project/uv) for installation — it's faster and more reliable than `pip`.
+### For Development
+
+```Shell
+# Create and activate a conda environment
+conda create -n EvoSci python=3.11 -y
+conda activate EvoSci
+
+# Install in development (editable) mode
+pip install EvoScientist
+# or
+pip install -e .
+```
 
 ### Option 1:
 Install the latest version directly from GitHub for quick setup:
@@ -66,14 +78,35 @@ uv pip install -e .
 ### CLI Inference  
 You can perform inference directly from the command line using our CLI tool:
 
-> TODO
+![demo](./assets/EvoScientist_cli.png)
 
+```Shell
+python -m EvoScientist
+```
 **Optional arguments:**  
 
 > TODO
 
 ### Script Inference
-> TODO
+```python
+from EvoScientist import agent
+from langchain_core.messages import HumanMessage
+from EvoScientist.utils import format_messages
+thread = {"configurable": {"thread_id": "1"}}
+question = "Hi?"
+last_len = 0
+
+for state in agent.stream(
+    {"messages": [HumanMessage(content=question)]},
+    config=thread,
+    stream_mode="values",
+):
+    msgs = state["messages"]
+    if len(msgs) > last_len:
+        format_messages(msgs[last_len:]) 
+        last_len = len(msgs)
+```
+
 
 ### Web Interface  
 
