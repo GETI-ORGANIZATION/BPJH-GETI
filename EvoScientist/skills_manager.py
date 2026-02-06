@@ -77,6 +77,11 @@ def _parse_skill_md(skill_md_path: Path) -> dict[str, str]:
 
     try:
         frontmatter = yaml.safe_load(frontmatter_match.group(1))
+        if not isinstance(frontmatter, dict):
+            return {
+                "name": skill_md_path.parent.name,
+                "description": "(empty frontmatter)",
+            }
         return {
             "name": frontmatter.get("name", skill_md_path.parent.name),
             "description": frontmatter.get("description", "(no description)"),
@@ -123,6 +128,9 @@ def _parse_github_url(url: str) -> tuple[str, str | None, str | None]:
     raise ValueError(f"Cannot parse GitHub URL: {url}")
 
 
+_CLONE_TIMEOUT = 120  # seconds
+
+
 def _clone_repo(repo: str, ref: str | None, dest: str) -> None:
     """Shallow-clone a GitHub repo."""
     clone_url = f"https://github.com/{repo}.git"
@@ -131,7 +139,10 @@ def _clone_repo(repo: str, ref: str | None, dest: str) -> None:
         cmd += ["--branch", ref]
     cmd += [clone_url, dest]
 
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=_CLONE_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        raise RuntimeError(f"git clone timed out after {_CLONE_TIMEOUT}s for {repo}")
     if result.returncode != 0:
         raise RuntimeError(f"git clone failed: {result.stderr.strip()}")
 
@@ -157,6 +168,42 @@ def _is_github_url(source: str) -> bool:
 def _validate_skill_dir(path: Path) -> bool:
     """Check if a directory contains a valid skill (has SKILL.md)."""
     return (path / "SKILL.md").is_file()
+
+
+def _find_skill_in_tree(root: str, skill_name: str) -> Path | None:
+    """Walk a directory tree to find a subdirectory named *skill_name* containing SKILL.md.
+
+    Skips hidden directories (starting with '.').
+
+    Returns:
+        The absolute Path to the skill directory, or None.
+    """
+    for dirpath, dirnames, _files in os.walk(root):
+        # Prune hidden directories
+        dirnames[:] = [d for d in dirnames if not d.startswith(".")]
+        if os.path.basename(dirpath) == skill_name:
+            candidate = Path(dirpath)
+            if _validate_skill_dir(candidate):
+                return candidate
+    return None
+
+
+# Allowed pattern for skill names: alphanumeric, hyphens, underscores
+_VALID_SKILL_NAME = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
+
+
+def _sanitize_name(name: str) -> str | None:
+    """Validate and sanitize a skill name.
+
+    Returns the cleaned name, or None if invalid.
+    """
+    name = name.strip()
+    if not name or not _VALID_SKILL_NAME.match(name):
+        return None
+    # Block path traversal components
+    if ".." in name or "/" in name or "\\" in name:
+        return None
+    return name
 
 
 def install_skill(source: str, dest_dir: str | None = None) -> dict:
@@ -197,10 +244,14 @@ def _install_from_local(source: str, dest_dir: str) -> dict:
 
     # Parse SKILL.md to get the skill name
     skill_info = _parse_skill_md(source_path / "SKILL.md")
-    skill_name = skill_info["name"]
+    skill_name = _sanitize_name(skill_info["name"])
+    if not skill_name:
+        return {"success": False, "error": f"Invalid skill name in SKILL.md: {skill_info['name']!r}"}
 
-    # Destination path
-    target_path = Path(dest_dir) / skill_name
+    # Destination path — resolve and verify it stays inside dest_dir
+    target_path = (Path(dest_dir) / skill_name).resolve()
+    if not str(target_path).startswith(str(Path(dest_dir).resolve())):
+        return {"success": False, "error": f"Skill name escapes destination: {skill_info['name']!r}"}
 
     # Remove existing if present
     if target_path.exists():
@@ -238,34 +289,48 @@ def _install_from_github(source: str, dest_dir: str) -> dict:
         else:
             skill_source = Path(clone_dir)
 
-        if not skill_source.exists():
-            return {"success": False, "error": f"Path not found in repo: {path or '/'}"}
-
-        if not _validate_skill_dir(skill_source):
-            # Maybe the repo root contains multiple skills?
-            if not path:
-                # Try to find skills in repo root
+        # Validate — if the direct path doesn't have SKILL.md, try auto-resolve
+        if not skill_source.exists() or not _validate_skill_dir(skill_source):
+            if path:
+                # The shorthand path (e.g. "canvas-design") may be nested deeper
+                # Walk the tree to find a directory with that name + SKILL.md
+                skill_name_hint = path.rstrip("/").rsplit("/", 1)[-1]
+                resolved = _find_skill_in_tree(clone_dir, skill_name_hint)
+                if resolved:
+                    skill_source = resolved
+                else:
+                    return {"success": False, "error": f"No SKILL.md found at '{path}' (also searched subdirectories) in: {source}"}
+            else:
+                # No path specified — list available skills in repo root
                 found_skills = []
                 for entry in os.listdir(clone_dir):
                     entry_path = Path(clone_dir) / entry
                     if entry_path.is_dir() and _validate_skill_dir(entry_path):
                         found_skills.append(entry)
 
-                if found_skills:
+                if len(found_skills) == 1:
+                    # Only one skill in repo — just install it
+                    skill_source = Path(clone_dir) / found_skills[0]
+                elif found_skills:
                     return {
                         "success": False,
                         "error": (
                             f"Multiple skills found in repo. "
-                            f"Please specify one: {', '.join(found_skills)}"
+                            f"Please specify one: {', '.join(sorted(found_skills))}"
                         ),
                     }
-
-            return {"success": False, "error": f"No SKILL.md found in: {source}"}
+                else:
+                    return {"success": False, "error": f"No SKILL.md found in: {source}"}
 
         # Parse skill info and copy
         skill_info = _parse_skill_md(skill_source / "SKILL.md")
-        skill_name = skill_info["name"]
-        target_path = Path(dest_dir) / skill_name
+        skill_name = _sanitize_name(skill_info["name"])
+        if not skill_name:
+            return {"success": False, "error": f"Invalid skill name in SKILL.md: {skill_info['name']!r}"}
+
+        target_path = (Path(dest_dir) / skill_name).resolve()
+        if not str(target_path).startswith(str(Path(dest_dir).resolve())):
+            return {"success": False, "error": f"Skill name escapes destination: {skill_info['name']!r}"}
 
         if target_path.exists():
             shutil.rmtree(target_path)
@@ -348,8 +413,14 @@ def uninstall_skill(name: str) -> dict:
         - success: bool
         - error: error message (if failed)
     """
-    user_dir = Path(USER_SKILLS_DIR)
-    target_path = user_dir / name
+    user_dir = Path(USER_SKILLS_DIR).resolve()
+
+    # Validate name to prevent path traversal
+    clean_name = _sanitize_name(name)
+    if not clean_name:
+        return {"success": False, "error": f"Invalid skill name: {name!r}"}
+
+    target_path = (user_dir / clean_name).resolve()
 
     if not target_path.exists():
         # Try to find by directory name (in case name differs from dir name)
@@ -358,15 +429,15 @@ def uninstall_skill(name: str) -> dict:
             for entry in user_dir.iterdir():
                 if entry.is_dir() and _validate_skill_dir(entry):
                     info = _parse_skill_md(entry / "SKILL.md")
-                    if info["name"] == name:
-                        found = entry
+                    if info["name"] == clean_name:
+                        found = entry.resolve()
                         break
 
         if not found:
             return {"success": False, "error": f"Skill not found: {name}"}
         target_path = found
 
-    # Check if it's a user skill (not system)
+    # Check resolved path is still inside user_dir
     if not str(target_path).startswith(str(user_dir)):
         return {"success": False, "error": f"Cannot uninstall system skill: {name}"}
 

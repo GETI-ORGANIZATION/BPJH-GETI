@@ -31,7 +31,7 @@ workspace/
 skills/
 memory/
 .deno_cache/
-*test.ipynb
+*.ipynb
 *CLAUDE.md
 *AGENTS.md
 *meals/

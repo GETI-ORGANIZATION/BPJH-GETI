@@ -26,9 +26,12 @@ from typing import Any, Optional
 
 import typer  # type: ignore[import-untyped]
 from prompt_toolkit import PromptSession  # type: ignore[import-untyped]
+from prompt_toolkit.completion import Completer, Completion  # type: ignore[import-untyped]
 from prompt_toolkit.history import FileHistory  # type: ignore[import-untyped]
 from prompt_toolkit.auto_suggest import AutoSuggestFromHistory  # type: ignore[import-untyped]
 from prompt_toolkit.formatted_text import HTML  # type: ignore[import-untyped]
+from prompt_toolkit.shortcuts import CompleteStyle  # type: ignore[import-untyped]
+from prompt_toolkit.styles import Style as PtStyle  # type: ignore[import-untyped]
 from rich.panel import Panel  # type: ignore[import-untyped]
 from rich.text import Text  # type: ignore[import-untyped]
 from rich.table import Table  # type: ignore[import-untyped]
@@ -200,17 +203,8 @@ def print_banner(
     for line, color in zip(EVOSCIENTIST_ASCII_LINES, _GRADIENT_COLORS):
         console.print(Text(line, style=f"{color} bold"))
     info = Text()
-    info.append("  Thread: ", style="dim")
-    info.append(thread_id, style="yellow")
-    if workspace_dir:
-        info.append("\n  Workspace: ", style="dim")
-        info.append(_shorten_path(workspace_dir), style="cyan")
-    if memory_dir:
-        trimmed = memory_dir.rstrip("/").rstrip("\\")
-        info.append("\n  Memory dir: ", style="dim")
-        info.append(_shorten_path(trimmed), style="cyan")
     if model or provider or mode:
-        info.append("\n  ", style="dim")
+        info.append("  ", style="dim")
         parts = []
         if model:
             parts.append(("Model: ", model))
@@ -223,20 +217,9 @@ def print_banner(
                 info.append("  ", style="dim")
             info.append(label, style="dim")
             info.append(value, style="magenta")
-    info.append("\n  Commands: ", style="dim")
-    info.append("/exit", style="bold")
-    info.append(", ", style="dim")
-    info.append("/new", style="bold")
-    info.append(", ", style="dim")
-    info.append("/thread", style="bold")
-    info.append(", ", style="dim")
-    info.append("/skills", style="bold")
-    info.append(", ", style="dim")
-    info.append("/install-skill", style="bold")
-    info.append(", ", style="dim")
-    info.append("/uninstall-skill", style="bold")
-    info.append(", ", style="dim")
-    info.append("/mcp", style="bold")
+    info.append("\n  Type ", style="#ffe082")
+    info.append("/", style="#ffe082 bold")
+    info.append(" for commands", style="#ffe082")
     console.print(info)
     console.print()
 
@@ -254,13 +237,13 @@ def _cmd_list_skills() -> None:
     skills = list_skills(include_system=False)
 
     if not skills:
-        console.print("[dim]No user skills installed.[/dim]")
+        console.print("[dim]No user-installed skills.[/dim]")
         console.print("[dim]Install with:[/dim] /install-skill <path-or-url>")
         console.print(f"[dim]Skills directory:[/dim] [cyan]{_shorten_path(str(USER_SKILLS_DIR))}[/cyan]")
         console.print()
         return
 
-    console.print(f"[bold]Installed Skills[/bold] ({len(skills)}):")
+    console.print(f"[bold]User-Installed Skills[/bold] ({len(skills)}):")
     for skill in skills:
         console.print(f"  [green]{skill.name}[/green] - {skill.description}")
     console.print(f"\n[dim]Location:[/dim] [cyan]{_shorten_path(str(USER_SKILLS_DIR))}[/cyan]")
@@ -620,6 +603,45 @@ def _auto_start_channel(agent: Any, thread_id: str, allowed_senders_csv: str) ->
         _print_channel_panel([("iMessage", False, str(e))])
 
 
+_SLASH_COMMANDS = [
+    ("/thread", "Show thread ID, workspace & memory dir"),
+    ("/new", "Start a new session"),
+    ("/skills", "List installed skills"),
+    ("/install-skill", "Add a skill from path or GitHub"),
+    ("/uninstall-skill", "Remove an installed skill"),
+    ("/mcp", "Manage MCP servers"),
+    ("/channel", "Configure messaging channels"),
+    ("/exit", "Quit EvoScientist"),
+]
+
+_COMPLETION_STYLE = PtStyle.from_dict({
+    "completion-menu": "bg:default noreverse nounderline noitalic",
+    "completion-menu.completion": "bg:default #888888 noreverse",
+    "completion-menu.completion.current": "bg:default default bold noreverse",
+    "completion-menu.meta.completion": "bg:default #888888 noreverse",
+    "completion-menu.meta.completion.current": "bg:default default bold noreverse",
+    "scrollbar.background": "bg:default",
+    "scrollbar.button": "bg:default",
+})
+
+
+class SlashCommandCompleter(Completer):
+    """Autocomplete for slash commands — triggers when input starts with '/'."""
+
+    def get_completions(self, document, complete_event):
+        text = document.text_before_cursor
+        if not text.startswith("/"):
+            return
+        for cmd, desc in _SLASH_COMMANDS:
+            if cmd.startswith(text):
+                yield Completion(
+                    cmd,
+                    start_position=-len(text),
+                    display=f"{cmd:<40}",
+                    display_meta=desc,
+                )
+
+
 def cmd_interactive(
     agent: Any,
     show_thinking: bool = True,
@@ -656,7 +678,10 @@ def cmd_interactive(
     session = PromptSession(
         history=FileHistory(history_file),
         auto_suggest=AutoSuggestFromHistory(),
-        enable_history_search=True,
+        completer=SlashCommandCompleter(),
+        complete_style=CompleteStyle.COLUMN,
+        complete_while_typing=True,
+        style=_COMPLETION_STYLE,
     )
 
     def _print_separator():
@@ -785,7 +810,7 @@ def cmd_interactive(
             while state["running"]:
                 try:
                     user_input = await session.prompt_async(
-                        HTML('<ansiblue><b>&gt;</b></ansiblue> ')
+                        HTML('<ansiblue><b>❯</b></ansiblue> ')
                     )
                     user_input = user_input.strip()
 
