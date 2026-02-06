@@ -25,10 +25,11 @@ from .llm import get_chat_model
 from .middleware import create_skills_middleware, create_memory_middleware
 from .prompts import RESEARCHER_INSTRUCTIONS, get_system_prompt
 from .utils import load_subagents
-from .tools import tavily_search, think_tool, skill_manager
+from .tools import tavily_search, think_tool, skill_manager, view_image
 from .paths import (
     ensure_dirs,
     default_workspace_dir,
+    set_active_workspace,
     MEMORY_DIR as _MEMORY_DIR_PATH,
     USER_SKILLS_DIR as _USER_SKILLS_DIR_PATH,
 )
@@ -51,6 +52,7 @@ MAX_ITERATIONS = _config.max_iterations
 # Workspace settings
 ensure_dirs()
 WORKSPACE_DIR = str(default_workspace_dir())
+set_active_workspace(WORKSPACE_DIR)
 MEMORY_DIR = str(_MEMORY_DIR_PATH)  # Shared across sessions (not per-session)
 SKILLS_DIR = str(Path(__file__).parent / "skills")
 USER_SKILLS_DIR = str(_USER_SKILLS_DIR_PATH)
@@ -112,6 +114,7 @@ backend = CompositeBackend(
 tool_registry = {
     "think_tool": think_tool,
     "tavily_search": tavily_search,
+    "view_image": view_image,
 }
 
 prompt_refs = {
@@ -128,7 +131,7 @@ subagents = load_subagents(
 _AGENT_KWARGS = dict(
     name="EvoScientist",
     model=chat_model,
-    tools=[think_tool, skill_manager],
+    tools=[think_tool, skill_manager, view_image],
     backend=backend,
     subagents=subagents,
     middleware=[
@@ -153,6 +156,7 @@ def create_cli_agent(workspace_dir: str | None = None):
     from langgraph.checkpoint.memory import InMemorySaver  # type: ignore[import-untyped]
 
     if workspace_dir:
+        set_active_workspace(workspace_dir)
         ws_backend = CustomSandboxBackend(
             root_dir=workspace_dir,
             virtual_mode=True,

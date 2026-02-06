@@ -8,7 +8,7 @@ Also provides the shared console and formatter globals.
 import asyncio
 import os
 import sys
-from typing import Any
+from typing import Any, Callable
 
 from rich.console import Console, Group  # type: ignore[import-untyped]
 from rich.live import Live  # type: ignore[import-untyped]
@@ -579,8 +579,8 @@ def _run_streaming(
     thread_id: str,
     show_thinking: bool,
     interactive: bool,
-    on_thinking: "Callable[[str], None] | None" = None,
-    on_todo: "Callable[[list[dict]], None] | None" = None,
+    on_thinking: Callable[[str], None] | None = None,
+    on_todo: Callable[[list[dict]], None] | None = None,
 ) -> str:
     """Run async streaming and render with Rich Live display.
 

@@ -11,7 +11,7 @@ from .config import (
 from .llm import get_chat_model, MODELS, list_models, DEFAULT_MODEL
 from .middleware import create_skills_middleware
 from .prompts import get_system_prompt, RESEARCHER_INSTRUCTIONS
-from .tools import tavily_search, think_tool
+from .tools import tavily_search, think_tool, view_image
 
 # Lazy imports for EvoScientist_agent and create_cli_agent to avoid
 # triggering model initialization at import time. This allows CLI commands
@@ -54,4 +54,5 @@ __all__ = [
     # Tools
     "tavily_search",
     "think_tool",
+    "view_image",
 ]

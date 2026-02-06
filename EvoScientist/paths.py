@@ -42,3 +42,19 @@ def new_run_dir(session_id: str | None = None) -> Path:
     if session_id is None:
         session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
     return RUNS_DIR / session_id
+
+
+# Active workspace (may differ from WORKSPACE_ROOT in per-session modes)
+_active_workspace: Path = WORKSPACE_ROOT
+
+
+def set_active_workspace(path: str | Path) -> None:
+    """Update the active workspace root (called on agent creation)."""
+    global _active_workspace
+    _active_workspace = Path(path).resolve()
+
+
+def resolve_virtual_path(virtual_path: str) -> Path:
+    """Resolve a virtual workspace path (e.g. /image.png) to a real filesystem path."""
+    vpath = virtual_path if virtual_path.startswith("/") else "/" + virtual_path
+    return (_active_workspace / vpath.lstrip("/")).resolve()
