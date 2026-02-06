@@ -35,6 +35,7 @@
   - [CLI Inference](#cli-inference)
   - [Script Inference](#script-inference)
   - [Web Interface](#web-interface)
+- [🔌 MCP Tools](#-mcp-tools)
 - [📊 Evaluation](#-evaluation)
 - [📝 Citation](#-citation)
 - [📚 Acknowledgments](#-acknowledgments)
@@ -201,6 +202,7 @@ EvoSci config path            # Show config file path
 | `/skills` | List installed user skills |
 | `/install-skill <source>` | Install a skill from local path or GitHub |
 | `/uninstall-skill <name>` | Uninstall a user-installed skill |
+| `/mcp` | List configured MCP servers and tool routing |
 
 **Skill Installation Examples:**
 
@@ -305,7 +307,118 @@ for state in EvoScientist_agent.stream(
 > TODO
 
 
-## 📊 Evaluation  
+## 🔌 MCP Tools
+
+EvoScientist supports [MCP](https://modelcontextprotocol.io/) servers, allowing you to extend agents with external tools (databases, APIs, etc.).
+
+### Adding Servers
+
+The quickest way to add an MCP server is from the CLI:
+
+```Shell
+# stdio transport (local process)
+EvoSci mcp add filesystem stdio npx -- -y @modelcontextprotocol/server-filesystem /tmp
+
+# http transport
+EvoSci mcp add brave-search http http://localhost:8080/mcp -H "Authorization:Bearer ${BRAVE_API_KEY}"
+
+# sse transport, routed to a specific agent
+EvoSci mcp add my-sse sse http://localhost:9090/sse -e research-agent
+
+# With tool allowlist
+EvoSci mcp add fs stdio npx -- -y @modelcontextprotocol/server-filesystem /tmp -t read_file,write_file
+```
+
+Or from the interactive CLI:
+
+```
+/mcp add filesystem stdio npx -y @modelcontextprotocol/server-filesystem /tmp
+/mcp remove filesystem
+/mcp list
+```
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| `--tools`, `-t` | Comma-separated tool allowlist (omit = all tools) |
+| `--expose-to`, `-e` | Comma-separated target agents (default: `main`) |
+| `--header`, `-H` | HTTP header as `Key:Value` (repeatable) |
+| `--env` | Env var as `KEY=VALUE` for stdio (repeatable) |
+
+### YAML Configuration
+
+Servers are stored in `~/.config/evoscientist/mcp.yaml`. You can also edit this file directly:
+
+```yaml
+filesystem:
+  transport: stdio
+  command: npx
+  args: ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/dir"]
+  tools: [read_file, write_file]     # optional allowlist (omit = all tools)
+  expose_to: [main, code-agent]      # optional routing (omit = ["main"])
+
+brave-search:
+  transport: http
+  url: "http://localhost:8080/mcp"
+  headers:
+    Authorization: "Bearer ${BRAVE_API_KEY}"
+  expose_to: [research-agent]
+```
+
+Use `${VAR}` syntax to reference environment variables in config values.
+
+### Supported Transports
+
+| Transport | Config Fields |
+|-----------|--------------|
+| `stdio` | `command`, `args`, `env` (optional) |
+| `http` | `url`, `headers` (optional) |
+| `sse` | `url`, `headers` (optional) |
+| `websocket` | `url` |
+
+### Tool Routing
+
+Use `expose_to` to control which agents receive each server's tools:
+
+- `main` — the main EvoScientist orchestrator agent
+- Any subagent name (`code-agent`, `research-agent`, `debug-agent`, `planner-agent`, `data-analysis-agent`, `writing-agent`)
+
+Tools routed to subagents are injected automatically — no need to edit `subagent.yaml`. All MCP tools are also registered in the tool registry, so they can be referenced by name in `subagent.yaml` if needed.
+
+### Editing Servers
+
+Update individual fields on an existing server without re-adding it:
+
+```Shell
+# Change routing
+EvoSci mcp edit filesystem --expose-to main,code-agent
+
+# Set a tool allowlist
+EvoSci mcp edit filesystem --tools read_file,write_file
+
+# Clear a tool allowlist (pass all tools)
+EvoSci mcp edit filesystem --tools none
+
+# Change URL
+EvoSci mcp edit my-api --url http://new-host:9090/mcp
+```
+
+Or interactively: `/mcp edit filesystem --expose-to main,code-agent`
+
+### Management Commands
+
+```Shell
+EvoSci mcp              # List configured servers
+EvoSci mcp list         # List configured servers
+EvoSci mcp add ...      # Add a server
+EvoSci mcp edit ...     # Edit an existing server
+EvoSci mcp remove ...   # Remove a server
+```
+
+All commands also work interactively: `/mcp`, `/mcp list`, `/mcp add ...`, `/mcp edit ...`, `/mcp remove <name>`.
+
+## 📊 Evaluation
 
 > TODO
 
