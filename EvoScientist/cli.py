@@ -387,11 +387,9 @@ def _cmd_channel(args: str, agent: Any, thread_id: str) -> None:
 
 def _mcp_list_servers() -> None:
     """Print a table of configured MCP servers."""
-    from .mcp_client import load_mcp_config
-    from pathlib import Path
+    from .mcp import load_mcp_config
 
-    config_path = Path(__file__).parent / "mcp.yaml"
-    config = load_mcp_config(config_path)
+    config = load_mcp_config()
 
     if not config:
         console.print("[dim]No MCP servers configured.[/dim]")
@@ -423,7 +421,7 @@ def _mcp_list_servers() -> None:
 def _cmd_mcp_add(args_str: str) -> None:
     """Handle ``/mcp add ...``."""
     import shlex
-    from .mcp_client import add_mcp_server, parse_mcp_add_args
+    from .mcp import add_mcp_server, parse_mcp_add_args
 
     if not args_str.strip():
         console.print("[bold]Usage:[/bold] /mcp add <name> <transport> <command-or-url> [args...]")
@@ -457,7 +455,7 @@ def _cmd_mcp_add(args_str: str) -> None:
 def _cmd_mcp_edit(args_str: str) -> None:
     """Handle ``/mcp edit <name> --field value ...``."""
     import shlex
-    from .mcp_client import edit_mcp_server, parse_mcp_edit_args
+    from .mcp import edit_mcp_server, parse_mcp_edit_args
 
     if not args_str.strip():
         console.print("[bold]Usage:[/bold] /mcp edit <name> --<field> <value> ...")
@@ -490,7 +488,7 @@ def _cmd_mcp_edit(args_str: str) -> None:
 
 def _cmd_mcp_remove(name: str) -> None:
     """Handle ``/mcp remove <name>``."""
-    from .mcp_client import remove_mcp_server
+    from .mcp import remove_mcp_server
 
     if not name.strip():
         console.print("[red]Usage:[/red] /mcp remove <name>")
@@ -1152,7 +1150,7 @@ def mcp_add(
       evosci mcp add my-api http http://localhost:8080/mcp -H "Authorization:Bearer tok"
       evosci mcp add my-sse sse http://localhost:9090/sse -e research-agent
     """
-    from .mcp_client import add_mcp_server
+    from .mcp import add_mcp_server
 
     kwargs: dict = {
         "name": name,
@@ -1194,12 +1192,79 @@ def mcp_add(
         raise typer.Exit(1)
 
 
+@mcp_app.command("edit")
+def mcp_edit(
+    name: str = typer.Argument(..., help="Server name to edit"),
+    transport: Optional[str] = typer.Option(None, "--transport", help="New transport type"),
+    command: Optional[str] = typer.Option(None, "--command", help="New command (stdio)"),
+    url: Optional[str] = typer.Option(None, "--url", help="New URL (http/sse/websocket)"),
+    tools: Optional[str] = typer.Option(None, "--tools", "-t", help="Comma-separated tool allowlist ('none' to clear)"),
+    expose_to: Optional[str] = typer.Option(None, "--expose-to", "-e", help="Comma-separated target agents ('none' to clear)"),
+    header: Optional[list[str]] = typer.Option(None, "--header", "-H", help="HTTP header as Key:Value (repeatable)"),
+    env: Optional[list[str]] = typer.Option(None, "--env", help="Env var as KEY=VALUE for stdio (repeatable)"),
+):
+    """Edit an existing MCP server in user config.
+
+    \b
+    Examples:
+      evosci mcp edit filesystem --expose-to main,code-agent
+      evosci mcp edit filesystem -t read_file,write_file
+      evosci mcp edit my-api --url http://new-host:9090/mcp
+      evosci mcp edit my-api --tools none
+    """
+    from .mcp import edit_mcp_server
+
+    fields: dict = {}
+    if transport is not None:
+        fields["transport"] = transport
+    if command is not None:
+        fields["command"] = command
+    if url is not None:
+        fields["url"] = url
+    if tools is not None:
+        fields["tools"] = None if tools == "none" else [t.strip() for t in tools.split(",") if t.strip()]
+    if expose_to is not None:
+        fields["expose_to"] = None if expose_to == "none" else [a.strip() for a in expose_to.split(",") if a.strip()]
+    if header:
+        hdr_dict = {}
+        for h in header:
+            if ":" in h:
+                k, v = h.split(":", 1)
+                hdr_dict[k.strip()] = v.strip()
+        if hdr_dict:
+            fields["headers"] = hdr_dict
+    if env:
+        env_dict = {}
+        for e in env:
+            if "=" in e:
+                k, v = e.split("=", 1)
+                env_dict[k.strip()] = v.strip()
+        if env_dict:
+            fields["env"] = env_dict
+
+    if not fields:
+        console.print("[red]No fields to edit. Use --transport, --command, --url, --tools, --expose-to, etc.[/red]")
+        raise typer.Exit(1)
+
+    try:
+        edit_mcp_server(name, **fields)
+        console.print(f"[green]Updated MCP server:[/green] [cyan]{name}[/cyan]")
+        for k, v in fields.items():
+            console.print(f"  [dim]{k}:[/dim] {v}")
+    except KeyError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1)
+    except ValueError as exc:
+        console.print(f"[red]Error: {exc}[/red]")
+        raise typer.Exit(1)
+
+
 @mcp_app.command("remove")
 def mcp_remove(
     name: str = typer.Argument(..., help="Server name to remove"),
 ):
     """Remove an MCP server from user config."""
-    from .mcp_client import remove_mcp_server
+    from .mcp import remove_mcp_server
 
     if remove_mcp_server(name):
         console.print(f"[green]Removed MCP server:[/green] [cyan]{name}[/cyan]")

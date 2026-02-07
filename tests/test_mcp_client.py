@@ -1,4 +1,4 @@
-"""Tests for EvoScientist.mcp_client module."""
+"""Tests for EvoScientist.mcp module."""
 
 import textwrap
 from types import SimpleNamespace
@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import pytest
 import yaml
 
-from EvoScientist.mcp_client import (
+from EvoScientist.mcp.client import (
     _interpolate_env,
     _filter_tools,
     _route_tools,
@@ -48,59 +48,52 @@ class TestInterpolateEnv:
 
 
 @pytest.fixture()
-def _no_user_mcp(monkeypatch, tmp_path):
-    """Isolate load_mcp_config tests from the real user config."""
-    monkeypatch.setattr(
-        "EvoScientist.mcp_client.USER_MCP_CONFIG",
-        tmp_path / "no_user_mcp.yaml",
-    )
+def mcp_config_file(monkeypatch, tmp_path):
+    """Point USER_MCP_CONFIG to a temp file for isolated testing."""
+    cfg = tmp_path / "mcp.yaml"
+    monkeypatch.setattr("EvoScientist.mcp.client.USER_MCP_CONFIG", cfg)
+    return cfg
 
 
 class TestLoadMcpConfig:
-    def test_missing_file_returns_empty(self, tmp_path, _no_user_mcp):
-        result = load_mcp_config(tmp_path / "nonexistent.yaml")
-        assert result == {}
+    def test_missing_file_returns_empty(self, mcp_config_file):
+        # File doesn't exist yet
+        assert load_mcp_config() == {}
 
-    def test_valid_file_parses(self, tmp_path, _no_user_mcp):
-        cfg = tmp_path / "mcp.yaml"
-        cfg.write_text(textwrap.dedent("""\
+    def test_valid_file_parses(self, mcp_config_file):
+        mcp_config_file.write_text(
+            textwrap.dedent("""\
             my-server:
               transport: stdio
               command: echo
               args: ["hello"]
-        """))
-        result = load_mcp_config(cfg)
+        """)
+        )
+        result = load_mcp_config()
         assert "my-server" in result
         assert result["my-server"]["transport"] == "stdio"
 
-    def test_empty_file_returns_empty(self, tmp_path, _no_user_mcp):
-        cfg = tmp_path / "mcp.yaml"
-        cfg.write_text("")
-        result = load_mcp_config(cfg)
-        assert result == {}
+    def test_empty_file_returns_empty(self, mcp_config_file):
+        mcp_config_file.write_text("")
+        assert load_mcp_config() == {}
 
-    def test_comments_only_returns_empty(self, tmp_path, _no_user_mcp):
-        cfg = tmp_path / "mcp.yaml"
-        cfg.write_text("# just a comment\n# another comment\n")
-        result = load_mcp_config(cfg)
-        assert result == {}
+    def test_comments_only_returns_empty(self, mcp_config_file):
+        mcp_config_file.write_text("# just a comment\n# another comment\n")
+        assert load_mcp_config() == {}
 
-    def test_env_var_interpolation(self, tmp_path, _no_user_mcp, monkeypatch):
+    def test_env_var_interpolation(self, mcp_config_file, monkeypatch):
         monkeypatch.setenv("TEST_TOKEN", "tok_abc")
-        cfg = tmp_path / "mcp.yaml"
-        cfg.write_text(textwrap.dedent("""\
+        mcp_config_file.write_text(
+            textwrap.dedent("""\
             my-server:
               transport: http
               url: "http://localhost:8080/mcp"
               headers:
                 Authorization: "Bearer ${TEST_TOKEN}"
-        """))
-        result = load_mcp_config(cfg)
+        """)
+        )
+        result = load_mcp_config()
         assert result["my-server"]["headers"]["Authorization"] == "Bearer tok_abc"
-
-    def test_none_config_path_returns_empty(self, _no_user_mcp):
-        result = load_mcp_config(None)
-        assert result == {}
 
 
 # ---- _build_connections ----
@@ -286,8 +279,8 @@ def user_mcp_dir(tmp_path, monkeypatch):
     cfg_dir = tmp_path / "config"
     cfg_dir.mkdir()
     cfg_file = cfg_dir / "mcp.yaml"
-    monkeypatch.setattr("EvoScientist.mcp_client.USER_CONFIG_DIR", cfg_dir)
-    monkeypatch.setattr("EvoScientist.mcp_client.USER_MCP_CONFIG", cfg_file)
+    monkeypatch.setattr("EvoScientist.mcp.client.USER_CONFIG_DIR", cfg_dir)
+    monkeypatch.setattr("EvoScientist.mcp.client.USER_MCP_CONFIG", cfg_file)
     return cfg_file
 
 
@@ -305,7 +298,8 @@ class TestAddMcpServer:
 
     def test_add_http_server(self, user_mcp_dir):
         entry = add_mcp_server(
-            "api", "http",
+            "api",
+            "http",
             url="http://localhost:8080/mcp",
             headers={"Authorization": "Bearer tok"},
         )
@@ -322,8 +316,10 @@ class TestAddMcpServer:
 
     def test_add_with_tools_and_expose_to(self, user_mcp_dir):
         entry = add_mcp_server(
-            "fs", "stdio",
-            command="npx", args=[],
+            "fs",
+            "stdio",
+            command="npx",
+            args=[],
             tools=["read_file"],
             expose_to=["main", "code-agent"],
         )
@@ -400,11 +396,15 @@ class TestParseMcpAddArgs:
         assert r["tools"] == ["a", "b"]
 
     def test_expose_to_flag(self):
-        r = parse_mcp_add_args(["srv", "http", "http://x", "--expose-to", "main,code-agent"])
+        r = parse_mcp_add_args(
+            ["srv", "http", "http://x", "--expose-to", "main,code-agent"]
+        )
         assert r["expose_to"] == ["main", "code-agent"]
 
     def test_header_flag(self):
-        r = parse_mcp_add_args(["srv", "http", "http://x", "--header", "Authorization:Bearer tok"])
+        r = parse_mcp_add_args(
+            ["srv", "http", "http://x", "--header", "Authorization:Bearer tok"]
+        )
         assert r["headers"] == {"Authorization": "Bearer tok"}
 
     def test_env_flag(self):
@@ -466,8 +466,12 @@ class TestEditMcpServer:
 
     def test_edit_preserves_unrelated_fields(self, user_mcp_dir):
         add_mcp_server(
-            "fs", "stdio", command="npx", args=["-y", "srv"],
-            tools=["a"], expose_to=["main"],
+            "fs",
+            "stdio",
+            command="npx",
+            args=["-y", "srv"],
+            tools=["a"],
+            expose_to=["main"],
         )
         entry = edit_mcp_server("fs", expose_to=["code-agent"])
         assert entry["tools"] == ["a"]

@@ -15,11 +15,12 @@ from typing import Any
 
 import yaml
 
+
 logger = logging.getLogger(__name__)
 
-# User-level config path
-USER_CONFIG_DIR = Path.home() / ".config" / "evoscientist"
-USER_MCP_CONFIG = USER_CONFIG_DIR / "mcp.yaml"
+# =============================================================================
+# Constants
+# =============================================================================
 
 # Regex for ${VAR} env var interpolation
 ENV_VAR_RE = re.compile(r"\$\{([^}]+)\}")
@@ -27,12 +28,34 @@ ENV_VAR_RE = re.compile(r"\$\{([^}]+)\}")
 # Supported transport protocols
 VALID_TRANSPORTS = {"stdio", "http", "streamable_http", "sse", "websocket"}
 
+# URL-based transports (share the same connection shape)
+_URL_TRANSPORTS = {"http", "streamable_http", "sse", "websocket"}
+
+
+def _get_mcp_config_dir() -> Path:
+    """Get the MCP configuration directory, respecting XDG_CONFIG_HOME."""
+    xdg_config = os.environ.get("XDG_CONFIG_HOME")
+    if xdg_config:
+        return Path(xdg_config) / "evoscientist"
+    return Path.home() / ".config" / "evoscientist"
+
+
+# User-level config path
+USER_CONFIG_DIR = _get_mcp_config_dir()
+USER_MCP_CONFIG = USER_CONFIG_DIR / "mcp.yaml"
+
+
+# =============================================================================
+# Environment variable interpolation
+# =============================================================================
+
 
 def _interpolate_env(value: str) -> str:
-    """Replace ``${VAR}`` patterns in *value* with environment variable values.
+    """Replace ``${VAR}`` patterns with environment variable values.
 
     Missing variables are replaced with an empty string and a warning is logged.
     """
+
     def _replace(match: re.Match) -> str:
         var = match.group(1)
         val = os.environ.get(var)
@@ -55,6 +78,11 @@ def _interpolate_value(value: Any) -> Any:
     return value
 
 
+# =============================================================================
+# User config persistence
+# =============================================================================
+
+
 def _load_user_config() -> dict[str, Any]:
     """Load the user-level MCP config, returning an empty dict if absent."""
     if USER_MCP_CONFIG.is_file():
@@ -69,7 +97,14 @@ def _load_user_config() -> dict[str, Any]:
 def _save_user_config(config: dict[str, Any]) -> None:
     """Write *config* to the user-level MCP config file."""
     USER_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-    USER_MCP_CONFIG.write_text(yaml.dump(config, default_flow_style=False, sort_keys=False))
+    USER_MCP_CONFIG.write_text(
+        yaml.dump(config, default_flow_style=False, sort_keys=False)
+    )
+
+
+# =============================================================================
+# CRUD operations
+# =============================================================================
 
 
 def add_mcp_server(
@@ -154,7 +189,7 @@ def edit_mcp_server(name: str, **fields: Any) -> dict[str, Any]:
         )
     if transport == "stdio" and not entry.get("command"):
         raise ValueError("stdio transport requires a command")
-    if transport in ("http", "streamable_http", "sse", "websocket") and not entry.get("url"):
+    if transport in _URL_TRANSPORTS and not entry.get("url"):
         raise ValueError(f"{transport} transport requires a url")
 
     user_cfg[name] = entry
@@ -173,6 +208,11 @@ def remove_mcp_server(name: str) -> bool:
     del user_cfg[name]
     _save_user_config(user_cfg)
     return True
+
+
+# =============================================================================
+# CLI argument parsing
+# =============================================================================
 
 
 def parse_mcp_add_args(tokens: list[str]) -> dict:
@@ -231,14 +271,18 @@ def parse_mcp_add_args(tokens: list[str]) -> dict:
 
     if transport == "stdio":
         if not positional:
-            raise ValueError("stdio transport requires a command after the transport name")
+            raise ValueError(
+                "stdio transport requires a command after the transport name"
+            )
         kwargs["command"] = positional[0]
         kwargs["args"] = positional[1:]
         if env:
             kwargs["env"] = env
     else:
         if not positional:
-            raise ValueError(f"{transport} transport requires a url after the transport name")
+            raise ValueError(
+                f"{transport} transport requires a url after the transport name"
+            )
         kwargs["url"] = positional[0]
         if headers:
             kwargs["headers"] = headers
@@ -290,11 +334,19 @@ def parse_mcp_edit_args(tokens: list[str]) -> tuple[str, dict]:
             i += 2
         elif tok == "--tools" and i + 1 < len(tokens):
             val = tokens[i + 1]
-            fields["tools"] = None if val == "none" else [t.strip() for t in val.split(",") if t.strip()]
+            fields["tools"] = (
+                None
+                if val == "none"
+                else [t.strip() for t in val.split(",") if t.strip()]
+            )
             i += 2
         elif tok == "--expose-to" and i + 1 < len(tokens):
             val = tokens[i + 1]
-            fields["expose_to"] = None if val == "none" else [a.strip() for a in val.split(",") if a.strip()]
+            fields["expose_to"] = (
+                None
+                if val == "none"
+                else [a.strip() for a in val.split(",") if a.strip()]
+            )
             i += 2
         elif tok == "--header" and i + 1 < len(tokens):
             kv = tokens[i + 1]
@@ -317,53 +369,42 @@ def parse_mcp_edit_args(tokens: list[str]) -> tuple[str, dict]:
         fields["env"] = env
 
     if not fields:
-        raise ValueError("No fields to edit. Use --transport, --command, --url, --tools, --expose-to, etc.")
+        raise ValueError(
+            "No fields to edit. Use --transport, --command, --url, --tools, --expose-to, etc."
+        )
 
     return name, fields
 
 
-def load_mcp_config(config_path: str | Path | None = None) -> dict[str, Any]:
-    """Load and merge MCP configuration.
+# =============================================================================
+# Config loading & merging
+# =============================================================================
 
-    Merges package-level config (shipped with EvoScientist) with user-level
-    config at ``~/.config/evoscientist/mcp.yaml``. User config wins on
-    conflict.
+
+def load_mcp_config() -> dict[str, Any]:
+    """Load MCP configuration from user config.
+
+    Reads ``~/.config/evoscientist/mcp.yaml`` and interpolates ``${VAR}``
+    environment variable references.
 
     Returns an empty dict if no servers are configured (MCP is optional).
     """
-    merged: dict[str, Any] = {}
+    if not USER_MCP_CONFIG.is_file():
+        return {}
 
-    # 1. Package-level config
-    if config_path:
-        pkg_path = Path(config_path)
-        if pkg_path.is_file():
-            try:
-                data = yaml.safe_load(pkg_path.read_text()) or {}
-                if isinstance(data, dict):
-                    merged.update(data)
-            except Exception as exc:
-                logger.warning("Failed to load MCP config %s: %s", pkg_path, exc)
+    try:
+        data = yaml.safe_load(USER_MCP_CONFIG.read_text()) or {}
+        if not isinstance(data, dict):
+            return {}
+    except Exception as exc:
+        logger.warning("Failed to load MCP config %s: %s", USER_MCP_CONFIG, exc)
+        return {}
 
-    # 2. User-level config (overrides package-level)
-    if USER_MCP_CONFIG.is_file():
-        try:
-            data = yaml.safe_load(USER_MCP_CONFIG.read_text()) or {}
-            if isinstance(data, dict):
-                merged.update(data)
-        except Exception as exc:
-            logger.warning("Failed to load user MCP config %s: %s", USER_MCP_CONFIG, exc)
-
-    # Interpolate env vars across all values
-    merged = _interpolate_value(merged)
-
-    return merged
+    return _interpolate_value(data)
 
 
 def _build_connections(config: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    """Convert our YAML config to ``MultiServerMCPClient`` connections format.
-
-    Each server entry maps to one connection dict with the fields that
-    ``MultiServerMCPClient`` expects for the given transport.
+    """Convert YAML config to ``MultiServerMCPClient`` connections format.
 
     Unknown transports are skipped with a warning.
     """
@@ -382,7 +423,7 @@ def _build_connections(config: dict[str, Any]) -> dict[str, dict[str, Any]]:
                 conn["env"] = server["env"]
             connections[name] = conn
 
-        elif transport in ("http", "streamable_http"):
+        elif transport in _URL_TRANSPORTS:
             conn = {
                 "transport": transport,
                 "url": server.get("url", ""),
@@ -391,26 +432,17 @@ def _build_connections(config: dict[str, Any]) -> dict[str, dict[str, Any]]:
                 conn["headers"] = server["headers"]
             connections[name] = conn
 
-        elif transport == "sse":
-            conn = {
-                "transport": "sse",
-                "url": server.get("url", ""),
-            }
-            if "headers" in server:
-                conn["headers"] = server["headers"]
-            connections[name] = conn
-
-        elif transport == "websocket":
-            conn = {
-                "transport": "websocket",
-                "url": server.get("url", ""),
-            }
-            connections[name] = conn
-
         else:
-            logger.warning("MCP server %r: unknown transport %r, skipping", name, transport)
+            logger.warning(
+                "MCP server %r: unknown transport %r, skipping", name, transport
+            )
 
     return connections
+
+
+# =============================================================================
+# Tool loading, filtering & routing
+# =============================================================================
 
 
 def _filter_tools(tools: list, allowed_names: list[str] | None) -> list:
@@ -462,8 +494,17 @@ async def _load_tools(config: dict[str, Any]) -> dict[str, list]:
     """Connect to MCP servers and retrieve tools.
 
     Returns a dict of server name -> list of LangChain tools.
+
+    Raises:
+        ImportError: if ``langchain-mcp-adapters`` is not installed.
     """
-    from langchain_mcp_adapters.client import MultiServerMCPClient
+    try:
+        from langchain_mcp_adapters.client import MultiServerMCPClient
+    except ImportError:
+        raise ImportError(
+            "MCP servers are configured but langchain-mcp-adapters is not installed.\n"
+            "Install with: pip install 'evoscientist[mcp]'"
+        )
 
     connections = _build_connections(config)
     if not connections:
@@ -476,9 +517,7 @@ async def _load_tools(config: dict[str, Any]) -> dict[str, list]:
         try:
             tools = await client.get_tools(server_name=server_name)
             server_tools[server_name] = tools
-            logger.info(
-                "MCP server %r: loaded %d tool(s)", server_name, len(tools)
-            )
+            logger.info("MCP server %r: loaded %d tool(s)", server_name, len(tools))
         except Exception as exc:
             logger.warning("MCP server %r: failed to load tools: %s", server_name, exc)
             server_tools[server_name] = []
@@ -486,11 +525,27 @@ async def _load_tools(config: dict[str, Any]) -> dict[str, list]:
     return server_tools
 
 
-def load_mcp_tools(config_path: str | Path | None = None) -> dict[str, list]:
+async def aload_mcp_tools() -> dict[str, list]:
+    """Async version of :func:`load_mcp_tools`.
+
+    Prefer this when already inside an async context (e.g. Jupyter, async CLI).
+    """
+    config = load_mcp_config()
+    if not config:
+        return {}
+    try:
+        server_tools = await _load_tools(config)
+    except Exception as exc:
+        logger.warning("MCP tool loading failed: %s", exc)
+        return {}
+    return _route_tools(config, server_tools)
+
+
+def load_mcp_tools() -> dict[str, list]:
     """Load MCP tools and return them grouped by target agent.
 
-    This is the main entry point. It:
-    1. Loads and merges YAML configs (package + user level)
+    This is the main synchronous entry point. It:
+    1. Loads user config from ``~/.config/evoscientist/mcp.yaml``
     2. Connects to each configured MCP server
     3. Filters tools per server allowlist
     4. Routes tools to target agents
@@ -500,22 +555,22 @@ def load_mcp_tools(config_path: str | Path | None = None) -> dict[str, list]:
         Key ``"main"`` = main agent. Other keys = subagent names.
         Returns empty dict if no MCP servers are configured.
     """
-    config = load_mcp_config(config_path)
+    config = load_mcp_config()
     if not config:
         return {}
 
-    # Run async loader — use nest_asyncio for Jupyter compatibility
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:
         loop = None
 
-    if loop and loop.is_running():
-        # Inside an already-running event loop (e.g. Jupyter)
-        import nest_asyncio
-        nest_asyncio.apply()
-
     try:
+        if loop and loop.is_running():
+            # Inside an already-running event loop (e.g. Jupyter) —
+            # nest_asyncio patches the loop so asyncio.run() works.
+            import nest_asyncio
+
+            nest_asyncio.apply()
         server_tools = asyncio.run(_load_tools(config))
     except Exception as exc:
         logger.warning("MCP tool loading failed: %s", exc)

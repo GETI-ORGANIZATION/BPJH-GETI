@@ -22,7 +22,7 @@ from deepagents.backends import FilesystemBackend, CompositeBackend
 from .backends import CustomSandboxBackend, MergedReadOnlyBackend
 from .config import get_effective_config, apply_config_to_env
 from .llm import get_chat_model
-from .mcp_client import load_mcp_tools
+from .mcp import load_mcp_tools
 from .middleware import create_skills_middleware, create_memory_middleware
 from .prompts import RESEARCHER_INSTRUCTIONS, get_system_prompt
 from .utils import load_subagents
@@ -118,26 +118,40 @@ tool_registry = {
     "view_image": view_image,
 }
 
-# MCP config path (stable across reloads)
-MCP_CONFIG = Path(__file__).parent / "mcp.yaml"
-
 # Base tools that every agent variant gets (before MCP)
 BASE_TOOLS = [think_tool, skill_manager, view_image]
+
+
+def _build_base_kwargs(base_backend, base_middleware):
+    """Build agent kwargs *without* MCP (fast, no subprocess spawning)."""
+    subs = load_subagents(
+        SUBAGENTS_CONFIG,
+        tool_registry=tool_registry,
+        prompt_refs=prompt_refs,
+    )
+    return dict(
+        name="EvoScientist",
+        model=chat_model,
+        tools=list(BASE_TOOLS),
+        backend=base_backend,
+        subagents=subs,
+        middleware=base_middleware,
+        system_prompt=SYSTEM_PROMPT,
+    )
 
 
 def load_mcp_and_build_kwargs(base_backend, base_middleware):
     """(Re-)load MCP tools and build agent kwargs.
 
-    Called once at import time for the default agent, and again on every
-    ``create_cli_agent()`` call so that ``/new`` picks up MCP config changes.
+    Called on every ``create_cli_agent()`` call so that ``/new`` picks up
+    MCP config changes. Falls back to base kwargs if no MCP configured.
     """
-    # Fresh tool registry each time — start from base tools
+    mcp_by_agent = load_mcp_tools()
+    if not mcp_by_agent:
+        return _build_base_kwargs(base_backend, base_middleware)
+
+    # Fresh tool registry — start from base tools + MCP tools
     registry = dict(tool_registry)
-
-    # Load current MCP config
-    mcp_by_agent = load_mcp_tools(MCP_CONFIG)
-
-    # Register all MCP tools so subagent.yaml can reference them
     for tools in mcp_by_agent.values():
         for t in tools:
             registry[t.name] = t
@@ -175,10 +189,10 @@ base_middleware = [
     create_skills_middleware(SKILLS_DIR, user_skills_dir=USER_SKILLS_DIR),
 ]
 
-# Shared kwargs for agent creation (snapshot at import time)
-_AGENT_KWARGS = load_mcp_and_build_kwargs(backend, base_middleware)
-
-# Default agent (no checkpointer) — used by langgraph dev / LangSmith / notebooks
+# Default agent (no checkpointer) — used by langgraph dev / LangSmith / notebooks.
+# Built WITHOUT MCP at import time to avoid spawning subprocesses on every import.
+# MCP tools are loaded on-demand in create_cli_agent().
+_AGENT_KWARGS = _build_base_kwargs(backend, base_middleware)
 EvoScientist_agent = create_deep_agent(**_AGENT_KWARGS).with_config({"recursion_limit": 500})
 
 
