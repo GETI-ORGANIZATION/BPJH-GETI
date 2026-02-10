@@ -618,17 +618,50 @@ def _step_parameters(config: EvoScientistConfig) -> tuple[int, int, bool]:
 
 
 _RECOMMENDED_SKILLS = [
+    # ── Ideation ──
     {
-        "label": "ML Paper Writing",
-        "source": "Orchestra-Research/AI-Research-SKILLs@20-ml-paper-writing",
+        "label": "Scientific Brainstorming  (generate & refine research ideas)",
+        "source": "https://github.com/K-Dense-AI/claude-scientific-skills/tree/main/scientific-skills/scientific-brainstorming",
     },
     {
-        "label": "Literature Review",
+        "label": "Scientific Critical Thinking  (evaluate claims & arguments rigorously)",
+        "source": "https://github.com/K-Dense-AI/claude-scientific-writer/tree/main/skills/scientific-critical-thinking",
+    },
+    # ── Literature & Data ──
+    {
+        "label": "Literature Review  (systematic survey of existing work)",
         "source": "https://github.com/K-Dense-AI/claude-scientific-writer/tree/main/skills/literature-review",
     },
     {
-        "label": "Scientific Brainstorming",
-        "source": "https://github.com/K-Dense-AI/claude-scientific-skills/tree/main/scientific-skills/scientific-brainstorming",
+        "label": "BioRxiv Database  (search & retrieve preprints)",
+        "source": "https://github.com/K-Dense-AI/claude-scientific-skills/tree/main/scientific-skills/biorxiv-database",
+    },
+    {
+        "label": "Citation Management  (organize references & generate BibTeX)",
+        "source": "https://github.com/K-Dense-AI/claude-scientific-writer/tree/main/skills/citation-management",
+    },
+    # ── Experimentation ──
+    {
+        "label": "HuggingFace Model Trainer  (fine-tune & train models on HF)",
+        "source": "https://github.com/huggingface/skills/tree/main/skills/hugging-face-model-trainer",
+    },
+    # ── Writing & Presentation ──
+    {
+        "label": "ML Paper Writing  (draft publication-ready ML/AI papers)",
+        "source": "Orchestra-Research/AI-Research-SKILLs@20-ml-paper-writing",
+    },
+    {
+        "label": "Doc Co-authoring  (structured collaborative writing workflow)",
+        "source": "https://github.com/anthropics/skills/tree/main/skills/doc-coauthoring",
+    },
+    {
+        "label": "Scientific Slides  (create research presentations)",
+        "source": "https://github.com/K-Dense-AI/claude-scientific-writer/tree/main/skills/scientific-slides",
+    },
+    # ── Review ──
+    {
+        "label": "Peer Review  (critique & improve manuscripts)",
+        "source": "https://github.com/K-Dense-AI/claude-scientific-writer/tree/main/skills/peer-review",
     },
 ]
 
@@ -782,18 +815,68 @@ def _step_skills() -> list[str]:
 
 
 _RECOMMENDED_MCP_SERVERS = [
+    # ── Built-in ──
     {
-        "label": "Sequential Thinking (structured reasoning for non-reasoning models)",
+        "label": "Sequential Thinking  (structured reasoning for non-reasoning models)",
         "name": "sequential-thinking",
         "command": "npx",
         "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"],
     },
     {
-        "label": "Docs by LangChain (documentation for building agents)",
+        "label": "Docs by LangChain  (documentation for building agents)",
         "name": "docs-langchain",
         "url": "https://docs.langchain.com/mcp",
     },
+    # ── Search & Knowledge ──
+    {
+        "label": "Perplexity  (AI-powered web search — requires PERPLEXITY_API_KEY)",
+        "name": "perplexity",
+        "command": "npx",
+        "args": ["-y", "@perplexity-ai/mcp-server"],
+        "env": {"PERPLEXITY_API_KEY": "${PERPLEXITY_API_KEY}"},
+        "env_key": "PERPLEXITY_API_KEY",
+        "env_hint": "export PERPLEXITY_API_KEY=pplx-... (get one at perplexity.ai/settings/api)",
+    },
+    {
+        "label": "Context7  (fast documentation lookup — API key unlocks higher rate limits)",
+        "name": "context7",
+        "command": "npx",
+        "args": ["-y", "@upstash/context7-mcp"],
+        "env": {"CONTEXT7_API_KEY": "${CONTEXT7_API_KEY}"},
+        "env_key": "CONTEXT7_API_KEY",
+        "env_hint": "export CONTEXT7_API_KEY=... (optional — unlocks higher rate limits)",
+        "env_optional": True,
+    },
+    # ── Research ──
+    {
+        "label": "DeepWiki  (search & read GitHub repo documentation)",
+        "name": "deepwiki",
+        "url": "https://mcp.deepwiki.com/mcp",
+    },
+    {
+        "label": "ArXiv  (search & fetch academic papers from arXiv)",
+        "name": "arxiv",
+        "pip_package": "arxiv-mcp-server",
+        "command": "arxiv-mcp-server",
+        "args": [],
+    },
 ]
+
+
+def _install_pip_package(package: str) -> bool:
+    """Silently install a pip package.
+
+    Returns:
+        True if installation succeeded.
+    """
+    try:
+        result = subprocess.run(
+            [sys.executable, "-m", "pip", "install", "-q", package],
+            capture_output=True, text=True, timeout=120,
+        )
+        return result.returncode == 0
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return False
 
 
 def _step_mcp_servers() -> list[str]:
@@ -801,6 +884,8 @@ def _step_mcp_servers() -> list[str]:
 
     Shows a checkbox list of recommended servers. Selected ones are added
     to the user MCP config via ``add_mcp_server()``.
+
+    Handles env-key prompts, pip package installs, and URL-based servers.
 
     Returns:
         List of server names that were installed.
@@ -830,10 +915,37 @@ def _step_mcp_servers() -> list[str]:
     for name in selected:
         srv = next(s for s in _RECOMMENDED_MCP_SERVERS if s["name"] == name)
         try:
+            # Prompt for required API keys
+            env_key = srv.get("env_key")
+            if env_key:
+                is_optional = srv.get("env_optional", False)
+                hint = srv.get("env_hint", "")
+                if is_optional:
+                    console.print(f"  [dim]{hint}[/dim]")
+                else:
+                    console.print(f"  [yellow]⚠ Requires {env_key}[/yellow]")
+                    console.print(f"  [dim]{hint}[/dim]")
+                    if not os.environ.get(env_key):
+                        console.print(f"  [dim]Set it before running EvoScientist: export {env_key}=...[/dim]")
+
+            # Install pip package if needed
+            pip_pkg = srv.get("pip_package")
+            if pip_pkg:
+                console.print(f"  [dim]Installing {pip_pkg}...[/dim]")
+                if not _install_pip_package(pip_pkg):
+                    _print_step_result("MCP", f"{name} — pip install {pip_pkg} failed", success=False)
+                    continue
+
+            # Add to MCP config
             if "url" in srv:
                 add_mcp_server(name, "streamable_http", url=srv["url"])
             else:
-                add_mcp_server(name, "stdio", command=srv["command"], args=srv["args"])
+                add_mcp_server(
+                    name, "stdio",
+                    command=srv["command"],
+                    args=srv.get("args", []),
+                    env=srv.get("env"),
+                )
             _print_step_result("MCP", f"{name}")
             installed.append(name)
         except Exception as e:

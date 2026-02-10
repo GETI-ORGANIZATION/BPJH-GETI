@@ -87,6 +87,10 @@ def get_chat_model(
     if provider == "anthropic" and "thinking" not in kwargs:
         kwargs["thinking"] = {"type": "enabled", "budget_tokens": 2000}
 
+    # Auto-enable thinking visibility for Google GenAI models
+    if provider == "google-genai":
+        kwargs.setdefault("include_thoughts", True)
+
     return init_chat_model(model=model_id, model_provider=provider, **kwargs)
 
 
