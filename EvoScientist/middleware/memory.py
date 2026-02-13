@@ -33,6 +33,8 @@ from collections.abc import Awaitable, Callable
 from contextvars import ContextVar
 from typing import TYPE_CHECKING, Any, Annotated, NotRequired, cast
 
+from pydantic import BaseModel, Field
+
 from langchain.agents.middleware.types import (
     AgentMiddleware,
     AgentState,
@@ -61,6 +63,49 @@ class EvoMemoryState(AgentState):
     evo_memory_content: NotRequired[Annotated[str, PrivateStateAttr]]
 
 # ---------------------------------------------------------------------------
+# Structured extraction schemas
+# ---------------------------------------------------------------------------
+
+class UserProfile(BaseModel):
+    """Extracted user profile information."""
+    name: str | None = Field(None, description="User's name")
+    role: str | None = Field(None, description="User's role (e.g. researcher, student)")
+    institution: str | None = Field(None, description="User's institution or organization")
+    language: str | None = Field(None, description="User's preferred language")
+
+
+class ResearchPreferences(BaseModel):
+    """Extracted research preference information."""
+    primary_domain: str | None = Field(None, description="Primary research domain")
+    sub_fields: str | None = Field(None, description="Research sub-fields")
+    preferred_frameworks: str | None = Field(None, description="Preferred software frameworks")
+    preferred_models: str | None = Field(None, description="Preferred AI/ML models")
+    hardware: str | None = Field(None, description="Available hardware (GPUs, etc.)")
+    constraints: str | None = Field(None, description="Resource or time constraints")
+
+
+class ExperimentConclusion(BaseModel):
+    """Extracted experiment conclusion (only when a complete experiment was run)."""
+    title: str = Field(description="Experiment name")
+    question: str | None = Field(None, description="Research question")
+    method: str | None = Field(None, description="Method summary")
+    key_result: str | None = Field(None, description="Primary metric or outcome")
+    conclusion: str | None = Field(None, description="One-line conclusion")
+    artifacts: str | None = Field(None, description="Report path if any")
+
+
+class ExtractedMemory(BaseModel):
+    """Structured output schema for memory extraction.
+
+    Only fields with genuinely new information should be populated.
+    """
+    user_profile: UserProfile | None = Field(None, description="New user profile information")
+    research_preferences: ResearchPreferences | None = Field(None, description="New research preferences")
+    experiment_conclusion: ExperimentConclusion | None = Field(None, description="Completed experiment conclusion")
+    learned_preferences: list[str] | None = Field(None, description="New preferences or habits observed")
+
+
+# ---------------------------------------------------------------------------
 # Extraction prompt – sent to a (cheap) LLM to pull structured facts
 # ---------------------------------------------------------------------------
 
@@ -79,42 +124,9 @@ current memory shown below.
 {conversation}
 </conversation>
 
-Return a JSON object with ONLY the keys that have new information to add.
-Omit keys where there is nothing new. Use `null` for unknown values.
-
-```json
-{{
-  "user_profile": {{
-    "name": "string or null",
-    "role": "string or null",
-    "institution": "string or null",
-    "language": "string or null"
-  }},
-  "research_preferences": {{
-    "primary_domain": "string or null",
-    "sub_fields": "string or null",
-    "preferred_frameworks": "string or null",
-    "preferred_models": "string or null",
-    "hardware": "string or null",
-    "constraints": "string or null"
-  }},
-  "experiment_conclusion": {{
-    "title": "string – experiment name",
-    "question": "string – research question",
-    "method": "string – method summary",
-    "key_result": "string – primary metric/outcome",
-    "conclusion": "string – one-line conclusion",
-    "artifacts": "string – report path if any"
-  }},
-  "learned_preferences": [
-    "string – each new preference or habit observed"
-  ]
-}}
-```
-
 Rules:
-- Only return keys with genuinely new information.
-- If nothing new was found, return an empty JSON object: `{{}}`
+- Only populate fields with genuinely new information.
+- Leave fields as null if there is nothing new.
 - Do NOT repeat information already in <current_memory>.
 - For experiment_conclusion, only include if a complete experiment was actually run.
 - Be concise. Each value should be a short phrase, not a paragraph.
@@ -552,33 +564,24 @@ class EvoMemoryMiddleware(AgentMiddleware):
             conversation="\n".join(conv_parts),
         )
 
-    @staticmethod
-    def _parse_extraction_response(text: str) -> dict[str, Any]:
-        """Parse JSON from an LLM extraction response."""
-        import json
-
-        json_match = re.search(r"```(?:json)?\s*([\s\S]*?)```", text)
-        if json_match:
-            text = json_match.group(1)
-        return json.loads(text.strip())
-
     def _extract(self, model: BaseChatModel, memory: str, messages: list[AnyMessage]) -> dict[str, Any]:
-        """Run LLM extraction on recent messages."""
+        """Run LLM extraction on recent messages using structured output."""
         prompt = self._build_extraction_prompt(memory, messages)
         try:
-            response = model.invoke(prompt)
-            text = response.content if isinstance(response.content, str) else str(response.content)
-            return self._parse_extraction_response(text)
+            structured_model = model.with_structured_output(ExtractedMemory)
+            result = structured_model.invoke(prompt)
+            return result.model_dump(exclude_none=True)
         except Exception as e:  # noqa: BLE001
             logger.warning("Memory extraction failed: %s", e)
             return {}
 
     async def _aextract(self, model: BaseChatModel, memory: str, messages: list[AnyMessage]) -> dict[str, Any]:
+        """Async: Run LLM extraction on recent messages using structured output."""
         prompt = self._build_extraction_prompt(memory, messages)
         try:
-            response = await model.ainvoke(prompt)
-            text = response.content if isinstance(response.content, str) else str(response.content)
-            return self._parse_extraction_response(text)
+            structured_model = model.with_structured_output(ExtractedMemory)
+            result = await structured_model.ainvoke(prompt)
+            return result.model_dump(exclude_none=True)
         except Exception as e:  # noqa: BLE001
             logger.warning("Memory extraction failed: %s", e)
             return {}

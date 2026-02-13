@@ -7,11 +7,13 @@ Re-exports middleware classes and factory functions so that existing
 from .memory import (
     EvoMemoryMiddleware,
     EvoMemoryState,
+    ExtractedMemory,
     create_memory_middleware,
 )
 
 __all__ = [
     "EvoMemoryMiddleware",
     "EvoMemoryState",
+    "ExtractedMemory",
     "create_memory_middleware",
 ]
