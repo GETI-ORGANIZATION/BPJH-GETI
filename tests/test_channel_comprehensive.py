@@ -567,7 +567,7 @@ class TestChannelBuildInbound:
             sender_id="u1", chat_id="c1", text="hello",
             message_id="m1", media_files=["/path/img.jpg"],
         )
-        msg = ch._build_inbound(raw)
+        msg = ch._raw_to_inbound(raw)
         assert msg is not None
         assert msg.channel == "stub"
         assert msg.sender_id == "u1"
@@ -575,21 +575,27 @@ class TestChannelBuildInbound:
         assert msg.media == ["/path/img.jpg"]
 
     def test_drops_disallowed_sender(self):
-        cfg = _FakeConfig(allowed_senders=["alice"])
-        ch = StubChannel(cfg)
-        raw = RawIncoming(sender_id="eve", chat_id="c1", text="hack")
-        assert ch._build_inbound(raw) is None
+        async def _test():
+            cfg = _FakeConfig(allowed_senders=["alice"])
+            ch = StubChannel(cfg)
+            raw = RawIncoming(sender_id="eve", chat_id="c1", text="hack")
+            await ch._enqueue_raw(raw)
+            assert ch._queue.qsize() == 0
+        _run(_test())
 
     def test_drops_disallowed_channel(self):
-        cfg = _FakeConfig(allowed_channels=["c1"])
-        ch = StubChannel(cfg)
-        raw = RawIncoming(sender_id="u1", chat_id="c2", text="hello")
-        assert ch._build_inbound(raw) is None
+        async def _test():
+            cfg = _FakeConfig(allowed_channels=["c1"])
+            ch = StubChannel(cfg)
+            raw = RawIncoming(sender_id="u1", chat_id="c2", text="hello")
+            await ch._enqueue_raw(raw)
+            assert ch._queue.qsize() == 0
+        _run(_test())
 
     def test_drops_empty_content_no_media(self):
         ch = StubChannel()
         raw = RawIncoming(sender_id="u1", chat_id="c1", text="")
-        assert ch._build_inbound(raw) is None
+        assert ch._raw_to_inbound(raw) is None
 
     def test_media_only_message_passes(self):
         ch = StubChannel()
@@ -597,7 +603,7 @@ class TestChannelBuildInbound:
             sender_id="u1", chat_id="c1", text="",
             media_files=["/path/file.pdf"],
         )
-        msg = ch._build_inbound(raw)
+        msg = ch._raw_to_inbound(raw)
         assert msg is not None
         assert msg.content == "[media only]"
 
@@ -607,14 +613,14 @@ class TestChannelBuildInbound:
             sender_id="u1", chat_id="c1", text="main text",
             content_annotations=["[attachment: photo.jpg]"],
         )
-        msg = ch._build_inbound(raw)
+        msg = ch._raw_to_inbound(raw)
         assert "[attachment: photo.jpg]" in msg.content
 
     def test_metadata_preserves_chat_id(self):
         ch = StubChannel()
         raw = RawIncoming(sender_id="u1", chat_id="c1", text="hi",
                           metadata={"extra": "data"})
-        msg = ch._build_inbound(raw)
+        msg = ch._raw_to_inbound(raw)
         assert msg.metadata["chat_id"] == "c1"
         assert msg.metadata["extra"] == "data"
 

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import pytest
 
 from EvoScientist.channels.base import Channel, RawIncoming
+from EvoScientist.channels.capabilities import ChannelCapabilities
 
 
 # ── Minimal concrete channel for testing base-class logic ─────────────
@@ -15,6 +16,7 @@ from EvoScientist.channels.base import Channel, RawIncoming
 class _StubConfig:
     allowed_senders: set[str] | None = None
     require_mention: str = "group"
+    dm_policy: str = "allowlist"
 
 
 class _StubChannel(Channel):
@@ -25,6 +27,11 @@ class _StubChannel(Channel):
 
     async def _send_chunk(self, chat_id, formatted_text, raw_text, reply_to, metadata):
         pass
+
+
+class _MentionStubChannel(_StubChannel):
+    """Stub with mention gating enabled."""
+    capabilities = ChannelCapabilities(mentions=True)
 
 
 def _run(coro):
@@ -86,69 +93,83 @@ class TestShouldProcess:
         assert ch._should_process(raw) is True
 
 
-class TestBuildInboundGating:
-    """Tests that _build_inbound integrates _should_process and _strip_mention."""
+class TestPipelineGating:
+    """Tests that _enqueue_raw pipeline integrates mention gating and _strip_mention."""
 
-    def test_group_not_mentioned_returns_none(self):
-        config = _StubConfig(require_mention="group")
-        ch = _StubChannel(config)
-        raw = RawIncoming(
-            sender_id="u1", chat_id="c1", text="hello",
-            is_group=True, was_mentioned=False,
-        )
-        assert ch._build_inbound(raw) is None
+    def test_group_not_mentioned_dropped(self):
+        async def _test():
+            config = _StubConfig(require_mention="group")
+            ch = _MentionStubChannel(config)
+            raw = RawIncoming(
+                sender_id="u1", chat_id="c1", text="hello",
+                is_group=True, was_mentioned=False,
+            )
+            await ch._enqueue_raw(raw)
+            assert ch._queue.qsize() == 0
+        _run(_test())
 
-    def test_group_mentioned_returns_message(self):
-        config = _StubConfig(require_mention="group")
-        ch = _StubChannel(config)
-        raw = RawIncoming(
-            sender_id="u1", chat_id="c1", text="hello",
-            is_group=True, was_mentioned=True,
-        )
-        msg = ch._build_inbound(raw)
-        assert msg is not None
-        assert msg.content == "hello"
+    def test_group_mentioned_passes(self):
+        async def _test():
+            config = _StubConfig(require_mention="group")
+            ch = _MentionStubChannel(config)
+            raw = RawIncoming(
+                sender_id="u1", chat_id="c1", text="hello",
+                is_group=True, was_mentioned=True,
+            )
+            await ch._enqueue_raw(raw)
+            assert ch._queue.qsize() == 1
+            msg = await ch._queue.get()
+            assert msg.content == "hello"
+        _run(_test())
 
-    def test_dm_returns_message_even_when_not_mentioned(self):
-        config = _StubConfig(require_mention="group")
-        ch = _StubChannel(config)
-        raw = RawIncoming(
-            sender_id="u1", chat_id="c1", text="hello",
-            is_group=False, was_mentioned=False,
-        )
-        msg = ch._build_inbound(raw)
-        assert msg is not None
+    def test_dm_passes_even_when_not_mentioned(self):
+        async def _test():
+            config = _StubConfig(require_mention="group")
+            ch = _MentionStubChannel(config)
+            raw = RawIncoming(
+                sender_id="u1", chat_id="c1", text="hello",
+                is_group=False, was_mentioned=False,
+            )
+            await ch._enqueue_raw(raw)
+            assert ch._queue.qsize() == 1
+        _run(_test())
 
     def test_strip_mention_called_for_group(self):
         """When is_group=True, _strip_mention should be applied to text."""
-        config = _StubConfig(require_mention="group")
-        ch = _StubChannel(config)
+        async def _test():
+            config = _StubConfig(require_mention="group")
+            ch = _MentionStubChannel(config)
+            ch._strip_mention = lambda text: text.replace("@bot ", "").strip()
+            # Rebuild middlewares so MentionGatingMiddleware picks up new strip_fn
+            ch._inbound_middlewares = ch._build_inbound_middlewares()
 
-        # Override _strip_mention to verify it's called
-        ch._strip_mention = lambda text: text.replace("@bot ", "").strip()
-
-        raw = RawIncoming(
-            sender_id="u1", chat_id="c1", text="@bot hello",
-            is_group=True, was_mentioned=True,
-        )
-        msg = ch._build_inbound(raw)
-        assert msg is not None
-        assert msg.content == "hello"
+            raw = RawIncoming(
+                sender_id="u1", chat_id="c1", text="@bot hello",
+                is_group=True, was_mentioned=True,
+            )
+            await ch._enqueue_raw(raw)
+            assert ch._queue.qsize() == 1
+            msg = await ch._queue.get()
+            assert msg.content == "hello"
+        _run(_test())
 
     def test_strip_mention_not_called_for_dm(self):
         """When is_group=False, _strip_mention should NOT be applied."""
-        config = _StubConfig(require_mention="group")
-        ch = _StubChannel(config)
+        async def _test():
+            config = _StubConfig(require_mention="group")
+            ch = _MentionStubChannel(config)
+            ch._strip_mention = lambda text: text.replace("@bot ", "").strip()
+            ch._inbound_middlewares = ch._build_inbound_middlewares()
 
-        ch._strip_mention = lambda text: text.replace("@bot ", "").strip()
-
-        raw = RawIncoming(
-            sender_id="u1", chat_id="c1", text="@bot hello",
-            is_group=False, was_mentioned=True,
-        )
-        msg = ch._build_inbound(raw)
-        assert msg is not None
-        assert msg.content == "@bot hello"
+            raw = RawIncoming(
+                sender_id="u1", chat_id="c1", text="@bot hello",
+                is_group=False, was_mentioned=True,
+            )
+            await ch._enqueue_raw(raw)
+            assert ch._queue.qsize() == 1
+            msg = await ch._queue.get()
+            assert msg.content == "@bot hello"
+        _run(_test())
 
 
 # ── Per-channel _strip_mention tests ─────────────────────────────────
