@@ -15,7 +15,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, AsyncIterator, Callable
 
-from ..paths import WORKSPACE_ROOT, MEDIA_DIR
+from ..paths import MEDIA_DIR
 
 from .bus.events import InboundMessage, OutboundMessage
 from .capabilities import ChannelCapabilities

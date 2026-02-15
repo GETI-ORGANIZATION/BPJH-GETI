@@ -1,7 +1,7 @@
 """Tests for EvoScientist onboarding wizard."""
 
 import subprocess
-from unittest.mock import patch, Mock, MagicMock
+from unittest.mock import patch, Mock
 
 import pytest
 
