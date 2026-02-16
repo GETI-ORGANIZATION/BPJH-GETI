@@ -1364,7 +1364,7 @@ def _step_channels(config: EvoScientistConfig) -> dict[str, object]:
                 __import__(import_check)
             except ImportError:
                 console.print("  [yellow]✗ Required package not installed.[/yellow]")
-                console.print(f"  [dim]Run:[/dim] pip install evoscientist\\[{pip_extra}]")
+                console.print(f'  [dim]Run:[/dim] pip install "evoscientist\\[{pip_extra}]"')
                 console.print("  [dim]Then re-run:[/dim] EvoSci onboard")
                 continue
 
