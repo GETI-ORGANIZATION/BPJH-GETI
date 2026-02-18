@@ -61,6 +61,23 @@ class SignalChannel(Channel):
         # (start() must return so that run() can iterate receive())
         self._listen_task = asyncio.create_task(self._listen_loop())
 
+    async def _cleanup(self) -> None:
+        if hasattr(self, "_listen_task") and self._listen_task:
+            self._listen_task.cancel()
+            self._listen_task = None
+        if self._writer:
+            self._writer.close()
+            try:
+                await self._writer.wait_closed()
+            except Exception:
+                pass
+            self._writer = None
+            self._reader = None
+        if self._daemon_proc:
+            self._daemon_proc.terminate()
+            self._daemon_proc = None
+        logger.info("Signal channel stopped")
+
     async def _ensure_daemon(self) -> None:
         """Start signal-cli daemon if not already running."""
         try:
@@ -404,22 +421,3 @@ class SignalChannel(Channel):
 
         await self._rpc_call("send", params)
         return True
-
-    # ── Cleanup ───────────────────────────────────────────────────
-
-    async def _cleanup(self) -> None:
-        if hasattr(self, "_listen_task") and self._listen_task:
-            self._listen_task.cancel()
-            self._listen_task = None
-        if self._writer:
-            self._writer.close()
-            try:
-                await self._writer.wait_closed()
-            except Exception:
-                pass
-            self._writer = None
-            self._reader = None
-        if self._daemon_proc:
-            self._daemon_proc.terminate()
-            self._daemon_proc = None
-        logger.info("Signal channel stopped")

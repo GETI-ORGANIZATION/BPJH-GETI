@@ -90,6 +90,17 @@ class QQChannel(Channel):
             logger.error(f"QQ auth failed: {e}")
             self._running = False
 
+    async def _cleanup(self) -> None:
+        self._running = False
+        if self._bot_task:
+            self._bot_task.cancel()
+            try:
+                await self._bot_task
+            except asyncio.CancelledError:
+                pass
+        self._client = None
+        logger.info("QQ channel stopped")
+
     # ── Incoming ──────────────────────────────────────────────────
 
     async def _on_msg(self, message, msg_type: str) -> None:
@@ -243,16 +254,3 @@ class QQChannel(Channel):
         if caption:
             await self._send_chunk(chat_id, caption, caption, None, metadata or {})
         return True
-
-    # ── Cleanup ───────────────────────────────────────────────────
-
-    async def _cleanup(self) -> None:
-        self._running = False
-        if self._bot_task:
-            self._bot_task.cancel()
-            try:
-                await self._bot_task
-            except asyncio.CancelledError:
-                pass
-        self._client = None
-        logger.info("QQ channel stopped")

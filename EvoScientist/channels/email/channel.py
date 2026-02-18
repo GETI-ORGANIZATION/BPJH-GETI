@@ -86,6 +86,17 @@ class EmailChannel(Channel, PollingMixin):
         logger.info(f"Email channel started (IMAP: {cfg.imap_host}, poll {cfg.poll_interval}s)")
         await self._start_polling()
 
+    async def _cleanup(self) -> None:
+        await self._stop_polling()
+        if self._imap:
+            try:
+                self._imap.close()
+                self._imap.logout()
+            except Exception:
+                pass
+            self._imap = None
+        logger.info("Email channel stopped")
+
     def _connect_imap(self) -> None:
         cfg = self.config
         try:
@@ -353,14 +364,3 @@ class EmailChannel(Channel, PollingMixin):
         except Exception as e:
             logger.error(f"SMTP attachment send failed: from={from_addr} to={to} error={e}")
             raise RuntimeError(f"SMTP attachment: {e}")
-
-    async def _cleanup(self) -> None:
-        await self._stop_polling()
-        if self._imap:
-            try:
-                self._imap.close()
-                self._imap.logout()
-            except Exception:
-                pass
-            self._imap = None
-        logger.info("Email channel stopped")
