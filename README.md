@@ -321,7 +321,7 @@ EvoSci mcp add sequential-thinking npx -- -y @modelcontextprotocol/server-sequen
 ```
 
 > [!NOTE]
-> For command options, config fields, tool routing, wildcard filtering, and troubleshooting, see the **[MCP Integration Guide](./EvoScientist/mcp/README.md)**.
+> For command options, config fields, tool routing, wildcard filtering, and troubleshooting, see the **[MCP Integration Guide](./EvoScientist/mcp)**.
 
 ## 📊 Evaluation
 
