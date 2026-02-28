@@ -7,12 +7,13 @@ import uuid
 from pathlib import Path
 
 from deepagents.backends import FilesystemBackend, LocalShellBackend
-from deepagents.backends.filesystem import WriteResult, EditResult
 from deepagents.backends.protocol import (
     BackendProtocol,
+    EditResult,
     ExecuteResponse,
     FileDownloadResponse,
     FileUploadResponse,
+    WriteResult,
 )
 
 # System path prefixes that should never appear in virtual paths.
