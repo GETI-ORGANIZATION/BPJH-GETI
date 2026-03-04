@@ -19,7 +19,7 @@ EvoScientist is a multi-agent AI system for automated scientific experimentation
 | Language | Python 3.11+ |
 | License | MIT |
 | Framework | [DeepAgents](https://github.com/langchain-ai/deepagents) + [LangChain](https://python.langchain.com/) + [LangGraph](https://langchain-ai.github.io/langgraph/) |
-| Default model | `claude-sonnet-4-5` (Anthropic) |
+| Default model | `claude-sonnet-4-6` (Anthropic) |
 | Tests | ~830 across 35 files, no API keys needed |
 | Config file | `~/.config/evoscientist/config.yaml` |
 
@@ -100,7 +100,7 @@ EvoSci config set tavily_api_key tvly-...
 | 1 | CLI arguments | `--model gpt-4o` |
 | 2 | Environment variables | `ANTHROPIC_API_KEY=sk-...` |
 | 3 | Config file | `~/.config/evoscientist/config.yaml` |
-| 4 | Defaults | `provider: anthropic`, `model: claude-sonnet-4-5` |
+| 4 | Defaults | `provider: anthropic`, `model: claude-sonnet-4-6` |
 
 Implementation: `config/settings.py` — `get_effective_config()` merges all four sources.
 
@@ -269,7 +269,7 @@ The sequence from config to running agent (`EvoScientist.py`):
 6. **MCP tools** — `_load_mcp_tools_cached()` loads tools from `~/.config/evoscientist/mcp.yaml`, cached by config signature hash.
 7. **Sub-agent loading** — `load_subagents()` reads `subagent.yaml`, wires tools from registry, injects `ToolErrorHandlerMiddleware` into each sub-agent.
 8. **`create_deep_agent(**kwargs)`** — DeepAgents constructs the LangGraph agent graph.
-9. **`.with_config({"recursion_limit": 500})`** — Sets LangGraph recursion limit.
+9. **`.with_config({"recursion_limit": 1000})`** — Sets LangGraph recursion limit.
 
 Two variants exist:
 - **`EvoScientist_agent`** — Lazy-loaded default (no checkpointer). For `langgraph dev`, notebooks, LangSmith.
@@ -857,7 +857,7 @@ The `CustomSandboxBackend` validates all shell commands and file paths. See [Key
 
 | Package | Version | Purpose | Docs |
 |---------|---------|---------|------|
-| `deepagents` | >=0.4.4 | Multi-agent orchestration framework | [GitHub](https://github.com/langchain-ai/deepagents) |
+| `deepagents` | >=0.4.5 | Multi-agent orchestration framework | [GitHub](https://github.com/langchain-ai/deepagents) |
 | `langchain` | >=1.2.10 | LLM framework | [Docs](https://python.langchain.com/) |
 | `langchain-anthropic` | >=1.3.3 | Anthropic provider (Claude) | [Docs](https://python.langchain.com/docs/integrations/chat/anthropic/) |
 | `langchain-openai` | >=0.3 | OpenAI provider (GPT) | [Docs](https://python.langchain.com/docs/integrations/chat/openai/) |

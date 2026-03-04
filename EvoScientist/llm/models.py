@@ -80,7 +80,7 @@ MODELS: dict[str, tuple[str, str]] = {
     name: (model_id, provider) for name, model_id, provider in _MODEL_ENTRIES
 }
 
-DEFAULT_MODEL = "claude-sonnet-4-5"
+DEFAULT_MODEL = "claude-sonnet-4-6"
 
 
 def get_models_for_provider(provider: str) -> list[tuple[str, str]]:

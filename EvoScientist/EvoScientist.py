@@ -292,7 +292,7 @@ def _get_default_agent():
         mw = _get_default_middleware()
         kwargs = load_mcp_and_build_kwargs(be, mw)
         _EvoScientist_agent = create_deep_agent(**kwargs).with_config(
-            {"recursion_limit": 500}
+            {"recursion_limit": 1000}
         )
     return _EvoScientist_agent
 
@@ -396,4 +396,4 @@ def create_cli_agent(workspace_dir: str | None = None, checkpointer=None, config
     return create_deep_agent(
         **kwargs,
         checkpointer=checkpointer,
-    ).with_config({"recursion_limit": 500})
+    ).with_config({"recursion_limit": 1000})
