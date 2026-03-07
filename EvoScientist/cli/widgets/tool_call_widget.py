@@ -146,25 +146,28 @@ class ToolCallWidget(Vertical):
         self._status = "success"
         self._result_content = content
         self._stop_timer()
-        self._render_header()
-        self._render_status()
-        self._render_output()
+        with self.app.batch_update():
+            self._render_header()
+            self._render_status()
+            self._render_output()
 
     def set_interrupted(self) -> None:
         """Mark tool call as interrupted/cancelled."""
         self._status = "interrupted"
         self._stop_timer()
-        self._render_header()
-        self._render_status()
+        with self.app.batch_update():
+            self._render_header()
+            self._render_status()
 
     def set_error(self, content: str) -> None:
         """Mark tool call as failed."""
         self._status = "error"
         self._result_content = content
         self._stop_timer()
-        self._render_header()
-        self._render_status()
-        self._render_output()
+        with self.app.batch_update():
+            self._render_header()
+            self._render_status()
+            self._render_output()
 
     def _render_output(self) -> None:
         output_w = self.query_one(".tool-output", Static)

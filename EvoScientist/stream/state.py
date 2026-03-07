@@ -92,6 +92,18 @@ class StreamState:
         self.todo_items: list[dict] = []
         # Latest text segment (reset on each tool_call)
         self.latest_text = ""
+        # Cached Markdown object for Rich CLI display (avoids O(n²) re-parsing)
+        self._cached_md_text: str = ""
+        self._cached_md: object | None = None
+
+    def get_response_markdown(self):
+        """Return cached Markdown object, only re-parsing when text changes."""
+        from rich.markdown import Markdown  # type: ignore[import-untyped]
+        text = (self.response_text or "").strip()
+        if text != self._cached_md_text:
+            self._cached_md_text = text
+            self._cached_md = Markdown(text) if text else None
+        return self._cached_md
 
     def _get_or_create_subagent(self, name: str, description: str = "") -> SubAgentState:
         if name not in self._subagent_map:

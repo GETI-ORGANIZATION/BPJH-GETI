@@ -434,6 +434,26 @@ def run_textual_interactive(
             _todo_sent = False
             _media_sent: set[str] = set()
             _MIN_THINKING_LEN = 200
+            _scroll_pending = False
+
+            def _schedule_scroll() -> None:
+                """Throttle scroll_end to at most once per 200ms.
+
+                Uses call_after_refresh so the scroll happens after Textual
+                finishes its layout pass — otherwise scroll_end may see
+                stale widget heights and not scroll far enough.
+                """
+                nonlocal _scroll_pending
+                if not _scroll_pending:
+                    _scroll_pending = True
+                    self.set_timer(0.2, _do_scroll)
+
+            def _do_scroll() -> None:
+                nonlocal _scroll_pending
+                _scroll_pending = False
+                self.call_after_refresh(
+                    lambda: container.scroll_end(animate=False),
+                )
 
             metadata = build_metadata(self._workspace_dir, model)
             response = ""
@@ -761,24 +781,22 @@ def run_textual_interactive(
                             await container.mount(assistant_w)
                             # Markdown rendering is async and needs multiple
                             # layout cycles to compute final height.  Schedule
-                            # extra deferred scrolls so the response is visible.
-                            self.set_timer(
-                                0.15,
-                                lambda: container.scroll_end(animate=False),
-                            )
-                            self.set_timer(
-                                0.4,
-                                lambda: container.scroll_end(animate=False),
-                            )
+                            # repeated deferred scrolls so long content stays
+                            # visible even when Markdown takes time to lay out.
+                            for delay in (0.15, 0.4, 0.8, 1.5):
+                                self.set_timer(
+                                    delay,
+                                    lambda: self.call_after_refresh(
+                                        lambda: container.scroll_end(animate=False),
+                                    ),
+                                )
 
                     elif event_type == "error":
                         error_msg = event.get("message", "Unknown error")
                         self._append_system(f"Error: {error_msg}", style="red")
 
                     # Scroll after Textual processes the layout update
-                    self.call_after_refresh(
-                        container.scroll_end, animate=False,
-                    )
+                    _schedule_scroll()
 
                 response = (state.response_text or "").strip()
 
@@ -838,10 +856,19 @@ def run_textual_interactive(
                     and len(state.thinking_text) >= _MIN_THINKING_LEN
                 ):
                     on_thinking_cb(state.thinking_text.rstrip())
-                # Final scroll to ensure last content is visible
+                # Final scrolls to ensure last content is visible.
+                # Markdown layout is async — schedule multiple deferred
+                # scrolls so long content eventually scrolls into view.
                 self.call_after_refresh(
-                    container.scroll_end, animate=False,
+                    lambda: container.scroll_end(animate=False),
                 )
+                for delay in (0.3, 0.8):
+                    self.set_timer(
+                        delay,
+                        lambda: self.call_after_refresh(
+                            lambda: container.scroll_end(animate=False),
+                        ),
+                    )
 
             return response
 

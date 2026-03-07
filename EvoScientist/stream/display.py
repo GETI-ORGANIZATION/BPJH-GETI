@@ -352,6 +352,7 @@ def create_streaming_display(
     is_final: bool = False,
     final_show_thinking: bool = False,
     final_thinking_max_length: int = DisplayLimits.THINKING_FINAL,
+    response_markdown: Any = None,
 ) -> Any:
     """Create Rich display layout for streaming output.
 
@@ -522,7 +523,7 @@ def create_streaming_display(
                 clean_response = clean_response.rstrip().removesuffix("...").rstrip()
             if clean_response:
                 elements.append(Text(""))  # blank separator
-                elements.append(Markdown(clean_response))
+                elements.append(response_markdown or Markdown(clean_response))
     else:
         # Intermediate narration (tools still running) -- dim italic above Task List
         if latest_text and has_used_tools and not all_done:
@@ -556,7 +557,7 @@ def create_streaming_display(
         # Stream response in real-time as tokens arrive (all tools done)
         if response_text and all_done:
             elements.append(Text(""))  # blank separator
-            elements.append(Markdown(response_text))
+            elements.append(response_markdown or Markdown(response_text))
 
     if not elements:
         return Group(Spinner("dots", text=" Processing...", style="cyan"))
@@ -790,6 +791,7 @@ def _run_streaming(
             live.update(create_streaming_display(
                 **state.get_display_args(),
                 show_thinking=show_thinking,
+                response_markdown=state.get_response_markdown(),
             ))
 
     with Live(console=console, auto_refresh=False, transient=False, vertical_overflow="visible") as live:
@@ -825,6 +827,7 @@ def _run_streaming(
                         show_thinking=show_thinking,
                         is_final=True,
                         final_show_thinking=False,
+                        response_markdown=state.get_response_markdown(),
                     )
                 else:
                     final_display = create_streaming_display(
@@ -833,6 +836,7 @@ def _run_streaming(
                         is_final=True,
                         final_show_thinking=True,
                         final_thinking_max_length=DisplayLimits.THINKING_FINAL,
+                        response_markdown=state.get_response_markdown(),
                     )
                 live.update(final_display)
                 live.refresh()
