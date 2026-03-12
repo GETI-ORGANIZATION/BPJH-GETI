@@ -40,7 +40,7 @@
 
 **EvoScientist aims to harness vibe research by enabling self-evolving AI scientists that autonomously explore, generate insights, and iteratively improve.
 It is designed to be opinionated and ready to use out of the box, offering a living research system that grows alongside evolving agent skills, toolsets, and memory bases.
-Going beyond traditional human-in-the-loop systems, EvoScientist introduces an AI-in-human’s-loop paradigm, where AI acts as a research buddy that co-evolves with human researchers and internalizes scholarly taste and scientific judgment.**
+Moving beyond traditional human-in-the-loop systems, EvoScientist adopts a human-on-the-loop paradigm, where AI acts as a research buddy that co-evolves with human researchers and internalizes scholarly taste and scientific judgment.**
 
 <!-- <h3>Unified Control, Different Surfaces</h3>
 [TODO: Add a Demo to demonstrate the different interfaces (TUI, mobile) and how they connect to the same underlying proxy system.] -->
@@ -61,8 +61,9 @@ Going beyond traditional human-in-the-loop systems, EvoScientist introduces an A
 - [x] ⚒️ 200+ predefined skills built in
 - [x] 🧩 Built-in research-lifecycle skills shipped
 - [x] 👋 Human-in-the-loop action approval
+- [x] 🦾 Agent-initiated human clarification
+- [x] 📑 Technical report on the way
 - [ ] 📺 Web app with workspace UI
-- [ ] 📑 Technical report on the way
 - [ ] 📹 Demo and tutorial in the works
 - [ ] 📊 Benchmark suite to be released
 - [ ] ⏰ Scheduled tasks for the core system planned
