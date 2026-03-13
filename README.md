@@ -71,7 +71,7 @@ Moving beyond traditional human-in-the-loop systems, EvoScientist adopts a human
 - **🔌 MCP & Skills** — Plug in MCP servers or install skills from GitHub on the fly.
 
 > [!TIP]
-> Looking for ready-to-use research skills? Check out [**EvoSkills**](https://github.com/EvoScientist/EvoSkills) — Powered by EvoScientist's multi-agent engine and installable skills, the entire end-to-end research lifecycle is covered out of the box.
+> Looking for ready-to-use research skills? Check out [**EvoSkills**](https://github.com/EvoScientist/EvoSkills) — Powered by **EvoScientist**'s multi-agent engine and installable skills, the entire end-to-end research lifecycle is covered out of the box.
 
 ## 🔥 News
 - **[13 Mar 2026]** 🚀 [**EvoScientist**](https://github.com/EvoScientist/EvoScientist) officially debuts!
