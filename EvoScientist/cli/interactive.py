@@ -112,6 +112,7 @@ _SLASH_COMMANDS = [
     ("/uninstall-skill", "Remove an installed skill"),
     ("/mcp", "Manage MCP servers"),
     ("/channel", "Configure messaging channels"),
+    ("/compact", "Compact conversation to free context"),
     ("/exit", "Quit EvoScientist"),
 ]
 
@@ -692,6 +693,16 @@ def cmd_interactive(
                                     state["thread_id"],
                                     send_thinking=channel_send_thinking,
                                 )
+                            continue
+
+                        if user_input.lower() == "/compact":
+                            from .commands import compact_conversation, render_compact_result
+                            with console.status("[cyan]Compacting conversation...[/cyan]"):
+                                result = await compact_conversation(
+                                    agent=state["agent"],
+                                    thread_id=state["thread_id"],
+                                )
+                            console.print(render_compact_result(result))
                             continue
 
                         # Stream agent response with metadata for persistence

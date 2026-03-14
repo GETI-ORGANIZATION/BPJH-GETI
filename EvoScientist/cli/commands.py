@@ -91,6 +91,254 @@ def channel_setup():
 
 
 # =============================================================================
+# Compact helper
+# =============================================================================
+
+
+class CompactResult:
+    """Structured result from compact_conversation.
+
+    Attributes:
+        status: "noop" (nothing to compact), "ok" (compacted), or "error".
+        message: Short human-readable message (used as fallback / TUI text).
+        messages_compacted: Number of messages summarized (0 for noop/error).
+        messages_kept: Number of messages unchanged.
+        tokens_before: Total tokens before compaction.
+        tokens_after: Total tokens after compaction.
+        tokens_summarized: Tokens in the summarized portion (before).
+        tokens_summary: Tokens in the summary message (after).
+        pct_decrease: Percentage decrease.
+    """
+
+    __slots__ = (
+        "status", "message",
+        "messages_compacted", "messages_kept",
+        "tokens_before", "tokens_after",
+        "tokens_summarized", "tokens_summary",
+        "pct_decrease",
+    )
+
+    def __init__(
+        self,
+        status: str,
+        message: str,
+        *,
+        messages_compacted: int = 0,
+        messages_kept: int = 0,
+        tokens_before: int = 0,
+        tokens_after: int = 0,
+        tokens_summarized: int = 0,
+        tokens_summary: int = 0,
+        pct_decrease: int = 0,
+    ):
+        self.status = status
+        self.message = message
+        self.messages_compacted = messages_compacted
+        self.messages_kept = messages_kept
+        self.tokens_before = tokens_before
+        self.tokens_after = tokens_after
+        self.tokens_summarized = tokens_summarized
+        self.tokens_summary = tokens_summary
+        self.pct_decrease = pct_decrease
+
+    def __str__(self) -> str:
+        return self.message
+
+
+def render_compact_result(result: CompactResult):  # -> rich.text.Text
+    """Render a CompactResult as styled Rich Text.
+
+    Uses the same visual language as the token usage display:
+    cyan for numbers, green for savings, dim for labels.
+    """
+    from rich.text import Text
+
+    output = Text()
+
+    if result.status == "noop":
+        output.append("○ ", style="dim")
+        output.append("Nothing to compact", style="dim")
+        if result.tokens_before > 0:
+            output.append(" — conversation is ~", style="dim")
+            output.append(f"{result.tokens_before:,}", style="cyan")
+            output.append(" tokens, within retention budget", style="dim")
+        elif result.message:
+            # Extract reason from message (e.g. "no messages")
+            output.append(f" — {result.message.split('—')[-1].strip()}" if "—" in result.message else "", style="dim")
+        return output
+
+    if result.status == "error":
+        output.append("✗ ", style="red")
+        output.append(result.message, style="red")
+        return output
+
+    # status == "ok"
+    output.append("✓ ", style="green")
+    output.append("Compacted ", style="dim")
+    output.append(f"{result.messages_compacted}", style="bold")
+    output.append(" messages", style="dim")
+    output.append("  [", style="dim")
+    output.append(f"{result.tokens_before:,}", style="cyan")
+    output.append(" → ", style="dim")
+    output.append(f"{result.tokens_after:,}", style="green")
+    output.append(" tokens", style="dim")
+    output.append(f"  ↓{result.pct_decrease}%", style="green bold")
+    output.append("]", style="dim")
+
+    # Second line: detail breakdown
+    output.append("\n  ", style="")
+    output.append("Summarized: ", style="dim")
+    output.append(f"{result.tokens_summarized:,}", style="cyan")
+    output.append(" → ", style="dim")
+    output.append(f"{result.tokens_summary:,}", style="green")
+    output.append("  │  ", style="dim")
+    output.append("Kept: ", style="dim")
+    output.append(f"{result.messages_kept}", style="cyan")
+    output.append(" messages unchanged", style="dim")
+
+    return output
+
+
+async def compact_conversation(agent: Any, thread_id: str | None) -> CompactResult:
+    """Compact the conversation by summarizing old messages.
+
+    Reads the agent's checkpointed state, creates a temporary
+    ``SummarizationMiddleware``, generates a summary, and writes
+    the compacted state back via ``aupdate_state``.
+
+    Returns a structured ``CompactResult``.
+    """
+    if not agent or not thread_id:
+        return CompactResult("noop", "Nothing to compact — start a conversation first.")
+
+    from langchain_core.messages.utils import count_tokens_approximately
+
+    config = {"configurable": {"thread_id": thread_id}}
+
+    try:
+        state_snapshot = await agent.aget_state(config)
+    except Exception as exc:
+        return CompactResult("error", f"Failed to read state: {exc}")
+
+    messages = state_snapshot.values.get("messages", [])
+    if not messages:
+        return CompactResult("noop", "Nothing to compact — no messages in conversation.")
+
+    from ..EvoScientist import _ensure_chat_model, _get_default_backend
+    from deepagents.middleware.summarization import (
+        SummarizationEvent,
+        SummarizationMiddleware,
+        compute_summarization_defaults,
+    )
+
+    try:
+        model = _ensure_chat_model()
+    except Exception as exc:
+        return CompactResult("error", f"Compaction requires a working model configuration: {exc}")
+
+    backend = _get_default_backend()
+
+    defaults = compute_summarization_defaults(model)
+    middleware = SummarizationMiddleware(
+        model=model,
+        backend=backend,
+        keep=defaults["keep"],
+        trim_tokens_to_summarize=None,
+    )
+
+    # Rebuild effective message list accounting for prior compaction
+    event = state_snapshot.values.get("_summarization_event")
+    effective = middleware._apply_event_to_messages(messages, event)
+
+    cutoff = middleware._determine_cutoff_index(effective)
+    if cutoff == 0:
+        conv_tokens = count_tokens_approximately(effective)
+        return CompactResult(
+            "noop",
+            f"Nothing to compact — conversation (~{conv_tokens:,} tokens) "
+            f"is within the retention budget.",
+            tokens_before=conv_tokens,
+        )
+
+    to_summarize, to_keep = middleware._partition_messages(effective, cutoff)
+
+    tokens_summarized = count_tokens_approximately(to_summarize)
+    tokens_kept = count_tokens_approximately(to_keep)
+    tokens_before = tokens_summarized + tokens_kept
+
+    # Skip if savings would be negligible — compacting ≤2 messages with
+    # <2% of total tokens prevents the infinite 1-message-at-a-time loop
+    # that occurs when the conversation sits just above the keep budget.
+    _MIN_COMPACT_MESSAGES = 3
+    _MIN_COMPACT_TOKEN_FRACTION = 0.02
+    if (
+        len(to_summarize) < _MIN_COMPACT_MESSAGES
+        and tokens_summarized < tokens_before * _MIN_COMPACT_TOKEN_FRACTION
+    ):
+        return CompactResult(
+            "noop",
+            f"Nothing to compact — only {len(to_summarize)} message(s) "
+            f"({tokens_summarized:,} tokens) would be summarized, "
+            f"not worth the overhead.",
+            tokens_before=tokens_before,
+        )
+
+    # Generate summary (LLM call)
+    summary = await middleware._acreate_summary(to_summarize)
+
+    # Offload old messages to backend
+    file_path: str | None = None
+    try:
+        file_path = await middleware._aoffload_to_backend(backend, to_summarize)
+    except Exception:
+        pass  # non-fatal — proceed without offloaded history
+
+    summary_msg = middleware._build_new_messages_with_path(summary, file_path)[0]
+
+    # Compute token savings
+    tokens_summary = count_tokens_approximately([summary_msg])
+    tokens_after = tokens_summary + tokens_kept
+    pct = (
+        round((tokens_before - tokens_after) / tokens_before * 100)
+        if tokens_before > 0
+        else 0
+    )
+
+    # Append savings note to summary message for model awareness
+    savings_note = (
+        f"\n\n{len(to_summarize)} messages were compacted "
+        f"({tokens_summarized:,} → {tokens_summary:,} tokens). "
+        f"Total context: {tokens_before:,} → {tokens_after:,} tokens "
+        f"({pct}% decrease), "
+        f"{len(to_keep)} messages unchanged."
+    )
+    summary_msg.content += savings_note
+
+    state_cutoff = middleware._compute_state_cutoff(event, cutoff)
+
+    new_event: SummarizationEvent = {
+        "cutoff_index": state_cutoff,
+        "summary_message": summary_msg,
+        "file_path": file_path,
+    }
+
+    await agent.aupdate_state(config, {"_summarization_event": new_event})
+
+    return CompactResult(
+        "ok",
+        f"Compacted {len(to_summarize)} messages "
+        f"({tokens_before:,} → {tokens_after:,} tokens, {pct}% decrease)",
+        messages_compacted=len(to_summarize),
+        messages_kept=len(to_keep),
+        tokens_before=tokens_before,
+        tokens_after=tokens_after,
+        tokens_summarized=tokens_summarized,
+        tokens_summary=tokens_summary,
+        pct_decrease=pct,
+    )
+
+
+# =============================================================================
 # Serve helpers
 # =============================================================================
 

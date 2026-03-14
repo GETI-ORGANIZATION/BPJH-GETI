@@ -59,6 +59,7 @@ _TUI_SLASH_COMMANDS = [
     ("/uninstall-skill", "Remove an installed skill"),
     ("/mcp", "Manage MCP servers"),
     ("/channel", "Configure messaging channels"),
+    ("/compact", "Compact conversation to free context"),
     ("/help", "Show available commands"),
     ("/exit", "Quit EvoScientist"),
 ]
@@ -1526,6 +1527,16 @@ def run_textual_interactive(
 
             if cmd == "/channel":
                 self._cmd_channel(arg)
+                return
+
+            if cmd == "/compact":
+                from .commands import compact_conversation, render_compact_result
+                self._append_system("Compacting conversation...")
+                result = await compact_conversation(
+                    agent=self._agent,
+                    thread_id=self._conversation_tid,
+                )
+                self._mount_renderable(render_compact_result(result))
                 return
 
             self._append_system(f"Unknown command: {command}", style="yellow")
