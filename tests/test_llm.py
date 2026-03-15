@@ -405,8 +405,8 @@ class TestThirdPartyRouting:
         assert call_kwargs["model_provider"] == "anthropic"
         assert call_kwargs["base_url"] == "http://localhost:8000/api/v1"
         assert call_kwargs["api_key"] == "sk-dummy"
-        # Should still get anthropic auto-config (thinking)
-        assert "thinking" in call_kwargs
+        # Proxy mode: thinking skipped for 4-6 models (ccproxy manages it)
+        assert "thinking" not in call_kwargs
 
     @patch("EvoScientist.llm.models.init_chat_model")
     def test_anthropic_no_base_url_when_unset(self, mock_init, monkeypatch):
@@ -450,9 +450,36 @@ class TestAutoConfig:
         assert call_kwargs["thinking"] == {"type": "enabled", "budget_tokens": 10000}
 
     @patch("EvoScientist.llm.models.init_chat_model")
-    def test_anthropic_4_6_adaptive_thinking(self, mock_init):
+    def test_anthropic_4_6_adaptive_thinking(self, mock_init, monkeypatch):
         """Anthropic 4-6 models get adaptive thinking with max effort."""
         mock_init.return_value = "mock_model"
+        monkeypatch.delenv("ANTHROPIC_BASE_URL", raising=False)
+
+        get_chat_model("claude-sonnet-4-6")
+
+        call_kwargs = mock_init.call_args[1]
+        assert call_kwargs["thinking"] == {"type": "adaptive"}
+        assert call_kwargs["effort"] == "max"
+
+    @patch("EvoScientist.llm.models.init_chat_model")
+    def test_anthropic_4_6_proxy_no_thinking(self, mock_init, monkeypatch):
+        """Anthropic 4-6 models via proxy skip thinking (ccproxy manages it)."""
+        mock_init.return_value = "mock_model"
+        monkeypatch.setenv("ANTHROPIC_BASE_URL", "http://127.0.0.1:8000")
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "ccproxy-oauth")
+
+        get_chat_model("claude-sonnet-4-6")
+
+        call_kwargs = mock_init.call_args[1]
+        assert "thinking" not in call_kwargs
+        assert "effort" not in call_kwargs
+
+    @patch("EvoScientist.llm.models.init_chat_model")
+    def test_anthropic_4_6_no_proxy_no_downgrade(self, mock_init, monkeypatch):
+        """Anthropic 4-6 models without proxy still get adaptive thinking."""
+        mock_init.return_value = "mock_model"
+        monkeypatch.setenv("ANTHROPIC_BASE_URL", "https://api.anthropic.com")
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-real")
 
         get_chat_model("claude-sonnet-4-6")
 

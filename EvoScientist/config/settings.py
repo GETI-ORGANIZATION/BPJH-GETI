@@ -61,6 +61,7 @@ class EvoScientistConfig:
     # API Keys
     anthropic_api_key: str = ""
     anthropic_base_url: str = ""
+    anthropic_auth_mode: str = "api_key"  # "api_key" | "oauth"
     openai_api_key: str = ""
     nvidia_api_key: str = ""
     google_api_key: str = ""
@@ -331,6 +332,7 @@ def list_config() -> dict[str, Any]:
 _ENV_MAPPINGS = {
     "anthropic_api_key": "ANTHROPIC_API_KEY",
     "anthropic_base_url": "ANTHROPIC_BASE_URL",
+    "anthropic_auth_mode": "EVOSCIENTIST_ANTHROPIC_AUTH_MODE",
     "openai_api_key": "OPENAI_API_KEY",
     "nvidia_api_key": "NVIDIA_API_KEY",
     "google_api_key": "GOOGLE_API_KEY",

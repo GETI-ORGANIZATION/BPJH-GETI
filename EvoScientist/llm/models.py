@@ -13,6 +13,40 @@ from typing import Any
 
 from langchain.chat_models import init_chat_model
 
+# ---------------------------------------------------------------------------
+# Patch: langchain-anthropic (>=1.3.4) calls .model_dump() on
+# context_management / container objects returned by the Anthropic SDK.
+# Proxies like ccproxy may return plain dicts which lack that method.
+# We wrap the class method to pre-convert dicts before the original runs.
+# ---------------------------------------------------------------------------
+def _patch_anthropic_proxy_compat() -> None:
+    try:
+        import types as _types
+        from langchain_anthropic.chat_models import ChatAnthropic as _CA
+
+        _orig = _CA._make_message_chunk_from_anthropic_event
+
+        def _safe(self: Any, event: Any, *args: Any, **kwargs: Any) -> Any:
+            for obj, attrs in [
+                (event, ("context_management",)),
+                (getattr(event, "delta", None), ("container",)),
+            ]:
+                if obj is None:
+                    continue
+                for attr in attrs:
+                    val = getattr(obj, attr, None)
+                    if isinstance(val, dict):
+                        d = val.copy()
+                        setattr(obj, attr,
+                                _types.SimpleNamespace(model_dump=lambda **kw: d))
+            return _orig(self, event, *args, **kwargs)
+
+        _CA._make_message_chunk_from_anthropic_event = _safe
+    except Exception:
+        pass
+
+_patch_anthropic_proxy_compat()
+
 _SILICONFLOW_BASE_URL = "https://api.siliconflow.cn/v1"
 _OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 _ZHIPU_BASE_URL = "https://open.bigmodel.cn/api/paas/v4"
@@ -123,9 +157,16 @@ def _apply_auto_config(
     """
     # Anthropic: extended thinking
     if provider == "anthropic" and "thinking" not in kwargs:
+        base_url = os.environ.get("ANTHROPIC_BASE_URL", "")
+        _is_proxy = "127.0.0.1" in base_url or "localhost" in base_url
         if model_id.endswith("4-6"):
-            kwargs["thinking"] = {"type": "adaptive"}
-            kwargs.setdefault("effort", "max")
+            if _is_proxy:
+                # ccproxy manages thinking internally; don't set it here
+                # to avoid 422 errors with thinking content blocks in history
+                pass
+            else:
+                kwargs["thinking"] = {"type": "adaptive"}
+                kwargs.setdefault("effort", "max")
         else:
             kwargs["thinking"] = {"type": "enabled", "budget_tokens": 10000}
 

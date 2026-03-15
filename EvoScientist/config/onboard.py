@@ -668,6 +668,78 @@ def _prompt_and_validate_api_key(
     return new_key if new_key else None
 
 
+def _step_anthropic_auth_mode(config: EvoScientistConfig) -> str:
+    """Step 2a: Select Anthropic authentication mode (API key vs OAuth).
+
+    Args:
+        config: Current configuration.
+
+    Returns:
+        Selected auth mode: "api_key", "oauth", or "auto".
+    """
+    from ..ccproxy_manager import is_ccproxy_available, check_ccproxy_auth
+
+    if not is_ccproxy_available():
+        console.print(
+            "  [dim]OAuth via ccproxy not available. "
+            "Install with: pip install \"evoscientist[oauth]\"[/dim]"
+        )
+        return "api_key"
+
+    choices = [
+        Choice(title="API Key (direct Anthropic access)", value="api_key"),
+        Choice(title="Claude Code OAuth (via ccproxy — no API key needed)", value="oauth"),
+    ]
+
+    current = config.anthropic_auth_mode
+    if current not in ("api_key", "oauth"):
+        current = "api_key"
+
+    auth_mode = questionary.select(
+        "Authentication mode:",
+        choices=choices,
+        default=current,
+        style=WIZARD_STYLE,
+        qmark=QMARK,
+        use_indicator=True,
+    ).ask()
+
+    if auth_mode is None:
+        raise KeyboardInterrupt()
+
+    # If OAuth selected, check auth status and offer login
+    if auth_mode in ("oauth", "auto"):
+        authed, msg = check_ccproxy_auth()
+        if authed:
+            console.print(f"  [green]✓ OAuth: {msg}[/green]")
+        else:
+            console.print(f"  [yellow]OAuth not authenticated: {msg}[/yellow]")
+            login = questionary.confirm(
+                "Log in to Claude now?",
+                default=True,
+                style=CONFIRM_STYLE,
+                qmark=QMARK,
+            ).ask()
+            if login:
+                console.print("  [dim]Opening browser for authentication...[/dim]")
+                try:
+                    subprocess.run(
+                        ["ccproxy", "auth", "login", "claude_api"],
+                        timeout=120,
+                    )
+                    authed, msg = check_ccproxy_auth()
+                    if authed:
+                        console.print(f"  [green]✓ OAuth: {msg}[/green]")
+                    else:
+                        console.print(f"  [red]Authentication failed: {msg}[/red]")
+                except subprocess.TimeoutExpired:
+                    console.print("  [red]Login timed out.[/red]")
+                except Exception as exc:
+                    console.print(f"  [red]Login error: {exc}[/red]")
+
+    return auth_mode
+
+
 def _step_provider_api_key(
     config: EvoScientistConfig,
     provider: str,
@@ -2091,8 +2163,13 @@ def run_onboard(skip_validation: bool = False) -> bool:
             ollama_url, ollama_detected_models = _step_ollama_base_url(config)
             config.ollama_base_url = ollama_url
 
-        # Step 2b: Provider API Key (skip for Ollama — no key needed)
-        # Maps provider name → config attribute for the API key.
+        # Step 2b: Auth mode (Anthropic only — API key vs OAuth)
+        if provider == "anthropic":
+            auth_mode = _step_anthropic_auth_mode(config)
+            config.anthropic_auth_mode = auth_mode
+
+        # Step 2c: Provider API Key (skip for Ollama — no key needed,
+        # and for Anthropic pure OAuth — key provided by ccproxy)
         _PROVIDER_KEY_ATTR = {
             "anthropic": "anthropic_api_key",
             "nvidia": "nvidia_api_key",
@@ -2103,7 +2180,11 @@ def run_onboard(skip_validation: bool = False) -> bool:
             "zhipu-code": "zhipu_api_key",
             "custom": "custom_api_key",
         }
-        if provider != "ollama":
+        _skip_api_key = (
+            provider == "ollama"
+            or (provider == "anthropic" and config.anthropic_auth_mode == "oauth")
+        )
+        if not _skip_api_key:
             new_key = _step_provider_api_key(config, provider, skip_validation)
             key_attr = _PROVIDER_KEY_ATTR.get(provider, "openai_api_key")
             if new_key is not None:
