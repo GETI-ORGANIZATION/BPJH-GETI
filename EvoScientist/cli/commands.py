@@ -512,9 +512,9 @@ def serve(
     config = get_effective_config(cli_overrides)
     apply_config_to_env(config)
 
-    # Auto-start ccproxy if OAuth mode
+    # Auto-start ccproxy if any provider uses OAuth mode
     _ccproxy_proc_serve = None
-    if config.provider == "anthropic" and config.anthropic_auth_mode == "oauth":
+    if config.anthropic_auth_mode == "oauth" or config.openai_auth_mode == "oauth":
         try:
             from ..ccproxy_manager import maybe_start_ccproxy, stop_ccproxy
 
@@ -917,7 +917,7 @@ def _main_callback(
     auth_mode: Optional[str] = typer.Option(
         None,
         "--auth-mode",
-        help="Anthropic auth mode: api_key (default) or oauth (ccproxy).",
+        help="Auth mode for Anthropic/OpenAI: api_key (default) or oauth (ccproxy).",
     ),
     ui: Optional[str] = typer.Option(
         None,
@@ -956,13 +956,14 @@ def _main_callback(
         if auth_mode not in ("api_key", "oauth"):
             raise typer.BadParameter("--auth-mode must be 'api_key' or 'oauth'")
         cli_overrides["anthropic_auth_mode"] = auth_mode
+        cli_overrides["openai_auth_mode"] = auth_mode
 
     config = get_effective_config(cli_overrides)
     apply_config_to_env(config)
 
-    # Auto-start ccproxy if OAuth mode
+    # Auto-start ccproxy if any provider uses OAuth mode
     _ccproxy_proc = None
-    if config.provider == "anthropic" and config.anthropic_auth_mode == "oauth":
+    if config.anthropic_auth_mode == "oauth" or config.openai_auth_mode == "oauth":
         try:
             from ..ccproxy_manager import maybe_start_ccproxy, stop_ccproxy
 

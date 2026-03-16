@@ -13,6 +13,7 @@ from EvoScientist.ccproxy_manager import (
     stop_ccproxy,
     ensure_ccproxy,
     setup_ccproxy_env,
+    setup_codex_env,
     maybe_start_ccproxy,
 )
 
@@ -47,6 +48,17 @@ class TestCheckCcproxyAuth:
         valid, msg = check_ccproxy_auth()
         assert valid is True
         assert "Authenticated" in msg
+        mock_run.assert_called_once()
+        assert mock_run.call_args[0][0] == ["ccproxy", "auth", "status", "claude_api"]
+
+    @patch("subprocess.run")
+    def test_valid_auth_codex(self, mock_run):
+        mock_run.return_value = MagicMock(
+            returncode=0, stdout="Authenticated", stderr=""
+        )
+        valid, msg = check_ccproxy_auth("codex")
+        assert valid is True
+        assert mock_run.call_args[0][0] == ["ccproxy", "auth", "status", "codex"]
 
     @patch("subprocess.run")
     def test_invalid_auth(self, mock_run):
@@ -169,6 +181,32 @@ class TestSetupCcproxyEnv:
 
 
 # =============================================================================
+# setup_codex_env
+# =============================================================================
+
+
+class TestSetupCodexEnv:
+    def test_sets_vars(self, monkeypatch):
+        monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
+        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+        setup_codex_env(8000)
+
+        assert os.environ["OPENAI_BASE_URL"] == "http://127.0.0.1:8000/codex/v1"
+        assert os.environ["OPENAI_API_KEY"] == "ccproxy-oauth"
+
+    def test_overrides_existing(self, monkeypatch):
+        """Force-sets vars even if already configured (oauth takes priority)."""
+        monkeypatch.setenv("OPENAI_BASE_URL", "http://custom:9999")
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-real-key")
+
+        setup_codex_env(8000)
+
+        assert os.environ["OPENAI_BASE_URL"] == "http://127.0.0.1:8000/codex/v1"
+        assert os.environ["OPENAI_API_KEY"] == "ccproxy-oauth"
+
+
+# =============================================================================
 # stop_ccproxy
 # =============================================================================
 
@@ -193,6 +231,7 @@ class TestMaybeStartCcproxy:
     def test_api_key_mode_noop(self):
         config = MagicMock()
         config.anthropic_auth_mode = "api_key"
+        config.openai_auth_mode = "api_key"
         assert maybe_start_ccproxy(config) is None
 
     @patch("EvoScientist.ccproxy_manager.setup_ccproxy_env")
@@ -204,6 +243,7 @@ class TestMaybeStartCcproxy:
         mock_ensure.return_value = proc
         config = MagicMock()
         config.anthropic_auth_mode = "oauth"
+        config.openai_auth_mode = "api_key"
 
         result = maybe_start_ccproxy(config)
         assert result is proc
@@ -213,6 +253,7 @@ class TestMaybeStartCcproxy:
     def test_oauth_mode_raises_no_binary(self, mock_avail):
         config = MagicMock()
         config.anthropic_auth_mode = "oauth"
+        config.openai_auth_mode = "api_key"
         with pytest.raises(RuntimeError, match="not found"):
             maybe_start_ccproxy(config)
 
@@ -224,5 +265,61 @@ class TestMaybeStartCcproxy:
     def test_oauth_mode_raises_no_auth(self, mock_avail, mock_auth):
         config = MagicMock()
         config.anthropic_auth_mode = "oauth"
+        config.openai_auth_mode = "api_key"
         with pytest.raises(RuntimeError, match="not authenticated"):
+            maybe_start_ccproxy(config)
+
+    @patch("EvoScientist.ccproxy_manager.setup_codex_env")
+    @patch("EvoScientist.ccproxy_manager.ensure_ccproxy")
+    @patch("EvoScientist.ccproxy_manager.check_ccproxy_auth", return_value=(True, "OK"))
+    @patch("EvoScientist.ccproxy_manager.is_ccproxy_available", return_value=True)
+    def test_openai_oauth_mode_starts(self, mock_avail, mock_auth, mock_ensure, mock_env):
+        proc = MagicMock()
+        mock_ensure.return_value = proc
+        config = MagicMock()
+        config.anthropic_auth_mode = "api_key"
+        config.openai_auth_mode = "oauth"
+
+        result = maybe_start_ccproxy(config)
+        assert result is proc
+        mock_auth.assert_called_once_with("codex")
+        mock_env.assert_called_once()
+
+    @patch("EvoScientist.ccproxy_manager.setup_codex_env")
+    @patch("EvoScientist.ccproxy_manager.setup_ccproxy_env")
+    @patch("EvoScientist.ccproxy_manager.ensure_ccproxy")
+    @patch("EvoScientist.ccproxy_manager.check_ccproxy_auth", return_value=(True, "OK"))
+    @patch("EvoScientist.ccproxy_manager.is_ccproxy_available", return_value=True)
+    def test_both_oauth_starts_both(self, mock_avail, mock_auth, mock_ensure, mock_anthropic_env, mock_codex_env):
+        proc = MagicMock()
+        mock_ensure.return_value = proc
+        config = MagicMock()
+        config.anthropic_auth_mode = "oauth"
+        config.openai_auth_mode = "oauth"
+
+        result = maybe_start_ccproxy(config)
+        assert result is proc
+        # Auth checked for both providers
+        assert mock_auth.call_count == 2
+        mock_anthropic_env.assert_called_once()
+        mock_codex_env.assert_called_once()
+
+    @patch("EvoScientist.ccproxy_manager.is_ccproxy_available", return_value=False)
+    def test_openai_oauth_raises_no_binary(self, mock_avail):
+        config = MagicMock()
+        config.anthropic_auth_mode = "api_key"
+        config.openai_auth_mode = "oauth"
+        with pytest.raises(RuntimeError, match="not found"):
+            maybe_start_ccproxy(config)
+
+    @patch(
+        "EvoScientist.ccproxy_manager.check_ccproxy_auth",
+        return_value=(False, "expired"),
+    )
+    @patch("EvoScientist.ccproxy_manager.is_ccproxy_available", return_value=True)
+    def test_openai_oauth_raises_no_auth(self, mock_avail, mock_auth):
+        config = MagicMock()
+        config.anthropic_auth_mode = "api_key"
+        config.openai_auth_mode = "oauth"
+        with pytest.raises(RuntimeError, match="Codex OAuth not authenticated"):
             maybe_start_ccproxy(config)

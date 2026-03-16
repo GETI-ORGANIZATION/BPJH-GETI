@@ -755,6 +755,80 @@ def _step_anthropic_auth_mode(config: EvoScientistConfig) -> str:
     return auth_mode
 
 
+def _step_openai_auth_mode(config: EvoScientistConfig) -> str:
+    """Step 2b: Select OpenAI authentication mode (API key vs Codex OAuth).
+
+    Args:
+        config: Current configuration.
+
+    Returns:
+        Selected auth mode: "api_key" or "oauth".
+    """
+    from ..ccproxy_manager import is_ccproxy_available, check_ccproxy_auth
+
+    if not is_ccproxy_available():
+        console.print(
+            "  [dim]OAuth via ccproxy not available. "
+            'Install with: pip install "evoscientist[oauth]"[/dim]'
+        )
+        return "api_key"
+
+    choices = [
+        Choice(title="API Key (direct OpenAI access)", value="api_key"),
+        Choice(
+            title="Codex OAuth (via ccproxy — no API key needed)", value="oauth"
+        ),
+    ]
+
+    current = config.openai_auth_mode
+    if current not in ("api_key", "oauth"):
+        current = "api_key"
+
+    auth_mode = questionary.select(
+        "OpenAI authentication mode:",
+        choices=choices,
+        default=current,
+        style=WIZARD_STYLE,
+        qmark=QMARK,
+        use_indicator=True,
+    ).ask()
+
+    if auth_mode is None:
+        raise KeyboardInterrupt()
+
+    # If OAuth selected, check auth status and offer login
+    if auth_mode == "oauth":
+        authed, msg = check_ccproxy_auth("codex")
+        if authed:
+            console.print(f"  [green]✓ Codex OAuth: {msg}[/green]")
+        else:
+            console.print(f"  [yellow]Codex OAuth not authenticated: {msg}[/yellow]")
+            login = questionary.confirm(
+                "Log in to Codex now?",
+                default=True,
+                style=CONFIRM_STYLE,
+                qmark=QMARK,
+            ).ask()
+            if login:
+                console.print("  [dim]Opening browser for authentication...[/dim]")
+                try:
+                    subprocess.run(
+                        ["ccproxy", "auth", "login", "codex"],
+                        timeout=120,
+                    )
+                    authed, msg = check_ccproxy_auth("codex")
+                    if authed:
+                        console.print(f"  [green]✓ Codex OAuth: {msg}[/green]")
+                    else:
+                        console.print(f"  [red]Authentication failed: {msg}[/red]")
+                except subprocess.TimeoutExpired:
+                    console.print("  [red]Login timed out.[/red]")
+                except Exception as exc:
+                    console.print(f"  [red]Login error: {exc}[/red]")
+
+    return auth_mode
+
+
 def _step_provider_api_key(
     config: EvoScientistConfig,
     provider: str,
@@ -2194,13 +2268,16 @@ def run_onboard(skip_validation: bool = False) -> bool:
             ollama_url, ollama_detected_models = _step_ollama_base_url(config)
             config.ollama_base_url = ollama_url
 
-        # Step 2b: Auth mode (Anthropic only — API key vs OAuth)
+        # Step 2b: Auth mode (Anthropic or OpenAI — API key vs OAuth)
         if provider == "anthropic":
             auth_mode = _step_anthropic_auth_mode(config)
             config.anthropic_auth_mode = auth_mode
+        elif provider == "openai":
+            auth_mode = _step_openai_auth_mode(config)
+            config.openai_auth_mode = auth_mode
 
         # Step 2c: Provider API Key (skip for Ollama — no key needed,
-        # and for Anthropic pure OAuth — key provided by ccproxy)
+        # and for Anthropic/OpenAI pure OAuth — key provided by ccproxy)
         _PROVIDER_KEY_ATTR = {
             "anthropic": "anthropic_api_key",
             "nvidia": "nvidia_api_key",
@@ -2214,6 +2291,8 @@ def run_onboard(skip_validation: bool = False) -> bool:
         }
         _skip_api_key = provider == "ollama" or (
             provider == "anthropic" and config.anthropic_auth_mode == "oauth"
+        ) or (
+            provider == "openai" and config.openai_auth_mode == "oauth"
         )
         if not _skip_api_key:
             new_key = _step_provider_api_key(config, provider, skip_validation)

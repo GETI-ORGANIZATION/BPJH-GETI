@@ -63,6 +63,7 @@ class EvoScientistConfig:
     anthropic_base_url: str = ""
     anthropic_auth_mode: str = "api_key"  # "api_key" | "oauth"
     openai_api_key: str = ""
+    openai_auth_mode: str = "api_key"  # "api_key" | "oauth"
     nvidia_api_key: str = ""
     google_api_key: str = ""
     siliconflow_api_key: str = ""
@@ -336,6 +337,7 @@ _ENV_MAPPINGS = {
     "anthropic_base_url": "ANTHROPIC_BASE_URL",
     "anthropic_auth_mode": "EVOSCIENTIST_ANTHROPIC_AUTH_MODE",
     "openai_api_key": "OPENAI_API_KEY",
+    "openai_auth_mode": "EVOSCIENTIST_OPENAI_AUTH_MODE",
     "nvidia_api_key": "NVIDIA_API_KEY",
     "google_api_key": "GOOGLE_API_KEY",
     "siliconflow_api_key": "SILICONFLOW_API_KEY",

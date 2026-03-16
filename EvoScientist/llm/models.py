@@ -9,6 +9,7 @@ convenient short names for common models.
 from __future__ import annotations
 
 import os
+import re
 from typing import Any
 
 from langchain.chat_models import init_chat_model
@@ -49,6 +50,18 @@ def _patch_anthropic_proxy_compat() -> None:
 
 
 _patch_anthropic_proxy_compat()
+
+# ---------------------------------------------------------------------------
+# Patch: ccproxy Codex embeds thinking as <thinking>...</thinking> tags
+# inside the content string. Strip these so they don't appear in output.
+# ---------------------------------------------------------------------------
+_THINKING_TAG_RE = re.compile(r"<thinking>.*?</thinking>\s*", re.DOTALL)
+
+
+def strip_thinking_tags(content: str) -> str:
+    """Remove ``<thinking>...</thinking>`` tags from ccproxy response content."""
+    return _THINKING_TAG_RE.sub("", content)
+
 
 _SILICONFLOW_BASE_URL = "https://api.siliconflow.cn/v1"
 _OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
@@ -188,7 +201,15 @@ def _apply_auto_config(
 
     # OpenAI (native, not third-party routed): reasoning
     if provider == "openai" and not is_third_party and "reasoning" not in kwargs:
-        kwargs["reasoning"] = {"effort": "high", "summary": "auto"}
+        base_url = os.environ.get("OPENAI_BASE_URL", "")
+        _is_openai_proxy = "127.0.0.1" in base_url or "localhost" in base_url
+        if _is_openai_proxy:
+            # ccproxy forces store=False. Setting `reasoning` triggers
+            # langchain-openai's Responses API path, which produces
+            # rs_ summary items that 404 on multi-turn. Skip entirely.
+            pass
+        else:
+            kwargs["reasoning"] = {"effort": "high", "summary": "auto"}
 
     # Google GenAI: surface thinking traces
     if provider == "google-genai":
@@ -255,11 +276,25 @@ def get_chat_model(
 
     # Anthropic base_url override (e.g. ccproxy at localhost:8000/api/v1)
     _is_third_party = provider in _THIRD_PARTY_PROVIDERS
+    _is_openai_proxy = False
     if provider == "anthropic":
         base_url = os.environ.get("ANTHROPIC_BASE_URL", "")
         if base_url:
             kwargs["base_url"] = base_url
         api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+        if api_key:
+            kwargs["api_key"] = api_key
+
+    # Native OpenAI base_url override (e.g. ccproxy Codex at localhost:8000/codex/v1)
+    elif provider == "openai":
+        base_url = os.environ.get("OPENAI_BASE_URL", "")
+        if base_url:
+            kwargs["base_url"] = base_url
+            _is_openai_proxy = "127.0.0.1" in base_url or "localhost" in base_url
+            if _is_openai_proxy:
+                kwargs.setdefault("streaming", False)  # ccproxy streaming incompatible
+                kwargs.setdefault("use_responses_api", False)  # force Chat Completions
+        api_key = os.environ.get("OPENAI_API_KEY", "")
         if api_key:
             kwargs["api_key"] = api_key
 
@@ -308,7 +343,9 @@ def get_chat_model(
 
     _apply_auto_config(provider, model_id, _is_third_party, kwargs)
 
-    return init_chat_model(model=model_id, model_provider=provider, **kwargs)
+    chat_model = init_chat_model(model=model_id, model_provider=provider, **kwargs)
+
+    return chat_model
 
 
 def list_models() -> list[str]:

@@ -525,14 +525,44 @@ class TestAutoConfig:
         assert call_kwargs["thinking"] == custom_thinking
 
     @patch("EvoScientist.llm.models.init_chat_model")
-    def test_openai_reasoning(self, mock_init):
+    def test_openai_reasoning(self, mock_init, monkeypatch):
         """Native OpenAI models get auto-reasoning."""
         mock_init.return_value = "mock_model"
+        monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
 
         get_chat_model("gpt-5-nano")
 
         call_kwargs = mock_init.call_args[1]
         assert call_kwargs["reasoning"] == {"effort": "high", "summary": "auto"}
+
+    @patch("EvoScientist.llm.models.init_chat_model")
+    def test_openai_base_url_override(self, mock_init, monkeypatch):
+        """OpenAI provider should support base_url override (e.g. ccproxy Codex)."""
+        mock_init.return_value = "mock_model"
+        monkeypatch.setenv("OPENAI_BASE_URL", "http://127.0.0.1:8000/codex/v1")
+        monkeypatch.setenv("OPENAI_API_KEY", "ccproxy-oauth")
+
+        get_chat_model("gpt-5-nano", provider="openai")
+
+        call_kwargs = mock_init.call_args[1]
+        assert call_kwargs["model_provider"] == "openai"
+        assert call_kwargs["base_url"] == "http://127.0.0.1:8000/codex/v1"
+        assert call_kwargs["api_key"] == "ccproxy-oauth"
+        # Proxy mode: reasoning skipped (triggers Responses API → rs_ 404)
+        assert "reasoning" not in call_kwargs
+
+    @patch("EvoScientist.llm.models.init_chat_model")
+    def test_openai_no_base_url_when_unset(self, mock_init, monkeypatch):
+        """OpenAI provider should not set base_url when env var is empty."""
+        mock_init.return_value = "mock_model"
+        monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-real")
+
+        get_chat_model("gpt-5-nano", provider="openai")
+
+        call_kwargs = mock_init.call_args[1]
+        assert call_kwargs["model_provider"] == "openai"
+        assert "base_url" not in call_kwargs
 
     @patch("EvoScientist.llm.models.init_chat_model")
     def test_google_thoughts(self, mock_init):

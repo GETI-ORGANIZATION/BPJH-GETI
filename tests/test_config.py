@@ -91,6 +91,16 @@ class TestEvoScientistConfig:
         config = EvoScientistConfig(anthropic_auth_mode="oauth")
         assert config.anthropic_auth_mode == "oauth"
 
+    def test_openai_auth_mode_default(self):
+        """Test that openai_auth_mode defaults to api_key."""
+        config = EvoScientistConfig()
+        assert config.openai_auth_mode == "api_key"
+
+    def test_openai_auth_mode_set(self):
+        """Test that openai_auth_mode can be set."""
+        config = EvoScientistConfig(openai_auth_mode="oauth")
+        assert config.openai_auth_mode == "oauth"
+
     def test_custom_values(self):
         """Test that custom values can be set."""
         config = EvoScientistConfig(
@@ -348,6 +358,14 @@ class TestPriorityChain:
 
         config = get_effective_config()
         assert config.anthropic_auth_mode == "oauth"
+
+    def test_env_openai_auth_mode_override(self, temp_config_dir, monkeypatch):
+        """Test openai_auth_mode from env overrides file."""
+        save_config(EvoScientistConfig(openai_auth_mode="api_key"))
+        monkeypatch.setenv("EVOSCIENTIST_OPENAI_AUTH_MODE", "oauth")
+
+        config = get_effective_config()
+        assert config.openai_auth_mode == "oauth"
 
 
 # =============================================================================

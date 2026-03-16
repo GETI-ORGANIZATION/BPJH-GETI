@@ -35,24 +35,65 @@ def is_ccproxy_available() -> bool:
     return shutil.which("ccproxy") is not None
 
 
-def check_ccproxy_auth() -> tuple[bool, str]:
+def _summarize_auth_output(raw: str) -> str:
+    """Extract key fields from ccproxy auth status output into a one-line summary.
+
+    Parses the Rich table output for Email, Subscription, and Status fields.
+    Returns e.g. ``"user@example.com (plus, active)"``.
+    Falls back to ``"Authenticated"`` if parsing fails.
+    """
+    import re as _re
+
+    # Strip ANSI escape sequences
+    clean = _re.sub(r"\x1b\[[0-9;]*m", "", raw)
+
+    # Parse "Key<2+ spaces>Value" table rows, match exact key names
+    fields: dict[str, str] = {}
+    for line in clean.splitlines():
+        m = _re.match(r"\s*(.+?)\s{2,}(.+)", line)
+        if not m:
+            continue
+        key, val = m.group(1).strip(), m.group(2).strip()
+        if key in ("Email", "Subscription", "Subscription Status"):
+            fields[key.lower().replace(" ", "_")] = val
+
+    email = fields.get("email", "")
+    sub = fields.get("subscription", "")
+    status = fields.get("subscription_status", "")
+
+    if email:
+        detail = ", ".join(filter(None, [sub, status]))
+        return f"{email} ({detail})" if detail else email
+    return "Authenticated"
+
+
+def check_ccproxy_auth(provider: str = "claude_api") -> tuple[bool, str]:
     """Check if ccproxy has valid OAuth credentials.
+
+    Args:
+        provider: ccproxy provider name ("claude_api" or "codex").
 
     Returns:
         (is_valid, message) tuple.
     """
     try:
         result = subprocess.run(
-            ["ccproxy", "auth", "status", "claude_api"],
+            ["ccproxy", "auth", "status", provider],
             capture_output=True,
             text=True,
             timeout=10,
         )
-        output = (result.stdout + result.stderr).strip()
         # ccproxy auth status exits 0 when authed
         if result.returncode == 0:
-            return True, output or "Authenticated"
-        return False, output or "Not authenticated"
+            summary = _summarize_auth_output(result.stdout)
+            return True, summary or "Authenticated"
+        # On failure, include stderr for diagnostics
+        raw = (result.stdout + result.stderr).strip()
+        # Strip ANSI escapes for cleaner error messages
+        import re as _re
+
+        clean = _re.sub(r"\x1b\[[0-9;]*m", "", raw)
+        return False, clean or "Not authenticated"
     except FileNotFoundError:
         return False, "ccproxy not found"
     except subprocess.TimeoutExpired:
@@ -151,7 +192,7 @@ def ensure_ccproxy(port: int = _DEFAULT_PORT) -> subprocess.Popen | None:
 
 
 def setup_ccproxy_env(port: int = _DEFAULT_PORT) -> None:
-    """Set environment variables for ccproxy routing.
+    """Set environment variables for Anthropic ccproxy routing.
 
     Force-sets ``ANTHROPIC_BASE_URL`` and ``ANTHROPIC_API_KEY`` so that
     downstream LangChain/Anthropic clients route through ccproxy.
@@ -163,6 +204,20 @@ def setup_ccproxy_env(port: int = _DEFAULT_PORT) -> None:
     os.environ["ANTHROPIC_API_KEY"] = "ccproxy-oauth"
 
 
+def setup_codex_env(port: int = _DEFAULT_PORT) -> None:
+    """Set environment variables for OpenAI/Codex ccproxy routing.
+
+    Force-sets ``OPENAI_BASE_URL`` and ``OPENAI_API_KEY`` so that
+    downstream LangChain/OpenAI clients route through ccproxy's Codex
+    endpoint.
+
+    Always overrides existing values — when this function is called,
+    we've decided to use ccproxy, so env must point to it.
+    """
+    os.environ["OPENAI_BASE_URL"] = f"http://127.0.0.1:{port}/codex/v1"
+    os.environ["OPENAI_API_KEY"] = "ccproxy-oauth"
+
+
 # =============================================================================
 # High-level orchestration
 # =============================================================================
@@ -171,9 +226,13 @@ def setup_ccproxy_env(port: int = _DEFAULT_PORT) -> None:
 def maybe_start_ccproxy(config: object) -> subprocess.Popen | None:
     """High-level: conditionally start ccproxy based on config.
 
-    Checks ``config.anthropic_auth_mode``:
+    Checks ``config.anthropic_auth_mode`` and ``config.openai_auth_mode``:
     - ``oauth``: ccproxy must work — raises on failure.
-    - ``api_key``: no-op.
+    - ``api_key``: no-op for that provider.
+
+    When either provider uses OAuth, ccproxy is started (single process
+    serves both providers). Environment variables are set for each
+    provider that uses OAuth.
 
     Args:
         config: An ``EvoScientistConfig`` instance.
@@ -181,8 +240,10 @@ def maybe_start_ccproxy(config: object) -> subprocess.Popen | None:
     Returns:
         Popen handle if we started ccproxy, None otherwise.
     """
-    auth_mode = getattr(config, "anthropic_auth_mode", "api_key")
-    if auth_mode != "oauth":
+    anthropic_oauth = getattr(config, "anthropic_auth_mode", "api_key") == "oauth"
+    openai_oauth = getattr(config, "openai_auth_mode", "api_key") == "oauth"
+
+    if not anthropic_oauth and not openai_oauth:
         return None
 
     if not is_ccproxy_available():
@@ -191,15 +252,32 @@ def maybe_start_ccproxy(config: object) -> subprocess.Popen | None:
             "Install it with: pip install 'evoscientist[oauth]'"
         )
 
-    authed, msg = check_ccproxy_auth()
-    if not authed:
-        raise RuntimeError(
-            f"ccproxy OAuth not authenticated: {msg}\n"
-            "Run: ccproxy auth login claude_api"
-        )
+    # Check auth for each provider that uses OAuth
+    if anthropic_oauth:
+        authed, msg = check_ccproxy_auth("claude_api")
+        if not authed:
+            raise RuntimeError(
+                f"ccproxy Anthropic OAuth not authenticated: {msg}\n"
+                "Run: ccproxy auth login claude_api"
+            )
 
+    if openai_oauth:
+        authed, msg = check_ccproxy_auth("codex")
+        if not authed:
+            raise RuntimeError(
+                f"ccproxy Codex OAuth not authenticated: {msg}\n"
+                "Run: ccproxy auth login codex"
+            )
+
+    # Start ccproxy (single process serves both providers)
     proc = ensure_ccproxy()
-    setup_ccproxy_env()
+
+    # Set environment for each OAuth provider
+    if anthropic_oauth:
+        setup_ccproxy_env()
+    if openai_oauth:
+        setup_codex_env()
+
     if proc:
         logger.info("Started ccproxy on port %d", _DEFAULT_PORT)
     else:
