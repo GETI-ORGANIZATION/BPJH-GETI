@@ -60,7 +60,7 @@ planner-agent:
 
 research-agent:
   description: "Web research for methods/baselines/datasets (one topic at a time, return actionable notes + sources)."
-  tools: [tavily_search, think_tool]
+  tools: [tavily_search, collect_sources, read_paper_source, extract_claims, think_tool]
   skills: ["/skills/"]
   system_prompt_ref: RESEARCHER_INSTRUCTIONS
 

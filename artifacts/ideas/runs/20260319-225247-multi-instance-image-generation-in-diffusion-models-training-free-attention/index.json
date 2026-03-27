@@ -1,0 +1,18 @@
+[
+  {
+    "title": "Orthogonal Key-Space Projection for Zero-Shot Multi-Instance Disentanglement",
+    "query": "multi-instance image generation in diffusion models, training-free attention",
+    "requirements": [
+      "novel and with good math properties",
+      "low-cost experiments"
+    ],
+    "notes": [
+      "prefer papers after 2024"
+    ],
+    "evidence_urls": [
+      "https://arxiv.org/abs/2603.10210",
+      "https://arxiv.org/abs/2512.20666"
+    ],
+    "brief_path": "artifacts/ideas/runs/20260319-225247-multi-instance-image-generation-in-diffusion-models-training-free-attention/orthogonal-key-space-projection-for-zero-shot-multi-instance-disentanglement.md"
+  }
+]

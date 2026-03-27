@@ -1,5 +1,6 @@
 """Typer command registrations — onboard, config, mcp, main callback."""
 
+import json
 import logging
 import os
 import queue
@@ -96,6 +97,100 @@ def channel_setup():
         console.print("[green]Channel configuration saved.[/green]")
     else:
         console.print("[dim]No changes made.[/dim]")
+
+
+@channel_app.command("probe")
+def channel_probe(
+    channel: Optional[str] = typer.Argument(
+        None,
+        help=(
+            "Channel name to probe (telegram/discord/slack/feishu/wechat/"
+            "dingtalk/email/qq/signal). If omitted, probe configured channels."
+        ),
+    ),
+):
+    """Validate channel credentials without starting the channel runtime."""
+    from ..config import load_config
+    from ..config.onboard import _probe_channel
+
+    config = load_config()
+
+    configured_channels = [
+        c.strip().lower()
+        for c in (getattr(config, "channel_enabled", "") or "").split(",")
+        if c.strip()
+    ]
+    targets = [channel.strip().lower()] if channel else configured_channels
+
+    if not targets:
+        console.print("[yellow]No channels selected for probing.[/yellow]")
+        console.print("[dim]Run [bold]evosci channel setup[/bold] first.[/dim]")
+        raise typer.Exit(1)
+
+    supported = {
+        "telegram",
+        "discord",
+        "slack",
+        "wechat",
+        "feishu",
+        "dingtalk",
+        "email",
+        "qq",
+        "signal",
+    }
+    unknown = [c for c in targets if c not in supported]
+    if unknown:
+        console.print(f"[red]Unsupported channel(s): {', '.join(unknown)}[/red]")
+        console.print(f"[dim]Supported: {', '.join(sorted(supported))}[/dim]")
+        raise typer.Exit(1)
+
+    required_fields: dict[str, list[str]] = {
+        "telegram": ["telegram_bot_token"],
+        "discord": ["discord_bot_token"],
+        "slack": ["slack_bot_token", "slack_app_token"],
+        "wechat": [
+            "wechat_wecom_corp_id",
+            "wechat_wecom_agent_id",
+            "wechat_wecom_secret",
+        ],
+        "feishu": ["feishu_app_id", "feishu_app_secret"],
+        "dingtalk": ["dingtalk_client_id", "dingtalk_client_secret"],
+        "email": [
+            "email_imap_host",
+            "email_imap_username",
+            "email_imap_password",
+            "email_smtp_host",
+            "email_smtp_username",
+            "email_smtp_password",
+            "email_from_address",
+        ],
+        "qq": ["qq_app_id", "qq_app_secret"],
+        "signal": ["signal_phone_number"],
+    }
+
+    failed = False
+    for ch in targets:
+        console.print(f"\n[bold cyan]Probing {ch}[/bold cyan]")
+
+        missing = [
+            key
+            for key in required_fields.get(ch, [])
+            if not str(getattr(config, key, "")).strip()
+        ]
+        if missing:
+            failed = True
+            console.print(
+                f"[yellow]Missing required config fields: {', '.join(missing)}[/yellow]"
+            )
+            continue
+
+        if not _probe_channel(ch, config, {}):
+            failed = True
+
+    if failed:
+        raise typer.Exit(1)
+
+    console.print("\n[green]All channel probes passed.[/green]")
 
 
 # =============================================================================
@@ -366,6 +461,356 @@ async def compact_conversation(agent: Any, thread_id: str | None) -> CompactResu
 _serve_logger = logging.getLogger(__name__)
 
 
+def _run_sync_coro(coro):
+    """Run a coroutine from sync CLI code."""
+    import asyncio
+
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+    if loop.is_running():
+        import nest_asyncio  # type: ignore[import-untyped]
+
+        nest_asyncio.apply()
+    return loop.run_until_complete(coro)
+
+
+def _is_idea_start_command(text: str) -> bool:
+    """Return True when a message should trigger the idea hard route."""
+    return text.strip().lower().startswith("/idea start")
+
+
+def _load_last_idea_run_state() -> dict[str, Any]:
+    path = Path("artifacts") / "ideas" / "last_run.json"
+    if not path.exists():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _looks_like_failure(message: str) -> bool:
+    lower = message.lower()
+    failure_markers = (
+        "failed to publish",
+        "credentials are missing",
+        "markdown file not found",
+        "error:",
+        "permission denied",
+        "forbidden",
+        "unauthorized",
+    )
+    return any(marker in lower for marker in failure_markers)
+
+
+def _prompt_issue_resolution(
+    msg: ChannelMessage,
+    *,
+    step_name: str,
+    issue_text: str,
+    allow_skip: bool = True,
+) -> str:
+    """Ask the user how to proceed after a recoverable issue."""
+    choices = [{"value": "retry"}]
+    if allow_skip:
+        choices.append({"value": "skip"})
+    choices.append({"value": "cancel"})
+    ask_user_data = {
+        "questions": [
+            {
+                "question": (
+                    f"{step_name} encountered a problem:\n{issue_text}\n"
+                    "How should I proceed?"
+                ),
+                "type": "multiple_choice",
+                "required": True,
+                "choices": choices,
+            }
+        ]
+    }
+    selection = channel_ask_user_prompt(ask_user_data, msg)
+    if selection.get("status") != "answered" or not selection.get("answers"):
+        return "cancel"
+    answer = str(selection["answers"][0]).strip().lower()
+    if answer == "retry":
+        return "retry"
+    if answer == "skip" and allow_skip:
+        return "skip"
+    return "cancel"
+
+
+def _publish_markdown_with_recovery(
+    msg: ChannelMessage,
+    *,
+    markdown_path: str,
+    title: str,
+    record_key: str,
+    step_name: str,
+    allow_skip: bool = True,
+) -> str:
+    """Publish markdown to Feishu and let the user decide on publish failures."""
+    from ..tools import publish_idea_brief_to_feishu_doc
+
+    while True:
+        publish_summary = _run_sync_coro(
+            publish_idea_brief_to_feishu_doc.ainvoke(
+                {
+                    "markdown_path": markdown_path,
+                    "title": title,
+                    "record_key": record_key,
+                }
+            )
+        )
+        if not _looks_like_failure(publish_summary):
+            return publish_summary
+
+        action = _prompt_issue_resolution(
+            msg,
+            step_name=step_name,
+            issue_text=publish_summary,
+            allow_skip=allow_skip,
+        )
+        if action == "retry":
+            continue
+        if action == "skip":
+            return (
+                f"{step_name} was skipped after a publish issue.\n"
+                f"Local markdown remains at: {markdown_path}"
+            )
+        return f"{step_name} was cancelled by user.\nLast issue: {publish_summary}"
+
+
+def _publish_pipeline_artifacts(msg: ChannelMessage, *, query: str) -> list[str]:
+    """Publish the latest pipeline artifacts to Feishu docs."""
+    from ..tools.idea import _slugify
+
+    state = _load_last_idea_run_state()
+    slug = _slugify(query)[:40] or "idea-run"
+    artifact_specs = [
+        (
+            str(state.get("crawl_report_markdown_path", "")),
+            f"Site Crawl Report - {query[:60]}",
+            f"idea-site-crawl-{slug}",
+            "Site crawl report publish",
+        ),
+        (
+            str(state.get("source_index_markdown_path", "")),
+            f"Source Index - {query[:60]}",
+            f"idea-source-index-{slug}",
+            "Source index publish",
+        ),
+        (
+            str(state.get("evidence_markdown_path", "")),
+            f"Evidence Report - {query[:60]}",
+            f"idea-evidence-{slug}",
+            "Evidence report publish",
+        ),
+        (
+            str(state.get("candidates_markdown_path", "")),
+            f"Idea Candidates - {query[:60]}",
+            f"idea-candidates-{slug}",
+            "Candidate doc publish",
+        ),
+        (
+            str(state.get("latest_log_path", "")),
+            f"Idea Pipeline Log - {query[:60]}",
+            f"idea-log-{slug}",
+            "Pipeline log publish",
+        ),
+    ]
+
+    summaries: list[str] = []
+    for markdown_path, title, record_key, step_name in artifact_specs:
+        if not markdown_path:
+            continue
+        summaries.append(
+            _publish_markdown_with_recovery(
+                msg,
+                markdown_path=markdown_path,
+                title=title,
+                record_key=record_key,
+                step_name=step_name,
+            )
+        )
+    return summaries
+
+
+def _handle_idea_start_command(
+    msg: ChannelMessage,
+    *,
+    workspace_dir: str,
+) -> str:
+    """Hard-route `/idea start` into the idea pipeline + candidate selection flow."""
+    from ..tools import (
+        build_idea_brief,
+        run_idea_pipeline,
+    )
+    from ..tools.idea import _slugify, parse_idea_request_text
+
+    parsed_request = parse_idea_request_text(msg.content)
+    query = parsed_request.get("query", "")
+    max_sources = int(parsed_request.get("max_sources", 4))
+    max_ideas = int(parsed_request.get("max_ideas", 3))
+
+    while True:
+        try:
+            pipeline_summary = _run_sync_coro(
+                run_idea_pipeline.ainvoke(
+                    {
+                        "request_text": msg.content,
+                        "max_sources": max_sources,
+                        "max_ideas": max_ideas,
+                        "publish_to_feishu_doc": False,
+                    }
+                )
+            )
+            break
+        except Exception as exc:
+            action = _prompt_issue_resolution(
+                msg,
+                step_name="Idea pipeline",
+                issue_text=str(exc),
+                allow_skip=False,
+            )
+            if action == "retry":
+                continue
+            return (
+                "Idea run cancelled before candidate generation.\n"
+                f"Reason: {exc}"
+            )
+
+    last_run_state = _load_last_idea_run_state()
+    log_path = str(
+        last_run_state.get(
+            "latest_log_path",
+            (Path("artifacts") / "ideas" / "latest_pipeline_log.md").as_posix(),
+        )
+    )
+    artifact_publish_summaries = _publish_pipeline_artifacts(msg, query=query)
+
+    candidates_path = Path(
+        str(
+            last_run_state.get(
+                "candidates_json_path",
+                (Path("artifacts") / "ideas" / "idea_candidates.json").as_posix(),
+            )
+        )
+    )
+    if not candidates_path.exists():
+        return pipeline_summary
+
+    try:
+        candidates = json.loads(candidates_path.read_text(encoding="utf-8"))
+    except Exception:
+        return pipeline_summary
+
+    if not isinstance(candidates, list) or not candidates:
+        return pipeline_summary
+
+    candidate_summaries: list[str] = []
+    for idx, candidate in enumerate(candidates, start=1):
+        candidate_summaries.extend(
+            [
+                f"{idx}. {candidate.get('title', f'Idea {idx}')}" ,
+                f"   - Description: {candidate.get('idea_description', 'N/A')}" ,
+                f"   - Motivation: {candidate.get('motivation', 'N/A')}" ,
+                f"   - Novelty: {candidate.get('novelty', 'N/A')}" ,
+                f"   - Background: {candidate.get('background', 'N/A')}" ,
+                f"   - Method: {candidate.get('proposed_method', 'N/A')}" ,
+                f"   - Validation: {candidate.get('validation_plan', 'N/A')}" ,
+                f"   - Risks: {candidate.get('risks', 'N/A')}" ,
+            ]
+        )
+
+    ask_user_data = {
+        "questions": [
+            {
+                "question": (
+                    "Please choose one candidate idea. Research notes:\n"
+                    + "\n".join(candidate_summaries)
+                ),
+                "type": "multiple_choice",
+                "required": True,
+                "choices": [
+                    {"value": candidate.get("title", f"Idea {idx + 1}")}
+                    for idx, candidate in enumerate(candidates)
+                ],
+            }
+        ]
+    }
+    selection = channel_ask_user_prompt(ask_user_data, msg)
+    if selection.get("status") != "answered" or not selection.get("answers"):
+        return (
+            f"{pipeline_summary}\n\n"
+            "Idea candidate selection was cancelled or timed out. "
+            f"Candidates are still saved at {candidates_path.as_posix()}."
+        )
+
+    selected_title = str(selection["answers"][0]).strip()
+    selected = next(
+        (
+            candidate
+            for candidate in candidates
+            if candidate.get("title", "").strip() == selected_title
+        ),
+        candidates[0],
+    )
+
+    brief_summary = build_idea_brief.invoke(
+        {
+            "idea_title": selected.get("title", "Idea Brief"),
+            "idea_description": selected.get("idea_description", ""),
+            "query": query,
+            "requirements": parsed_request.get("requirements", []),
+            "evidence_urls": selected.get("evidence_urls", []),
+            "notes": parsed_request.get("notes", []),
+            "output_dir": str(last_run_state.get("run_dir", (Path("artifacts") / "ideas").as_posix())),
+        }
+    )
+
+    brief_path = (
+        Path(str(last_run_state.get("run_dir", (Path("artifacts") / "ideas").as_posix())))
+        / f"{_slugify(selected.get('title', 'idea-brief'))}.md"
+    )
+    publish_summary = _publish_markdown_with_recovery(
+        msg,
+        markdown_path=str(brief_path),
+        title=selected.get("title", "Idea Brief"),
+        record_key=f"idea-brief-{_slugify(selected.get('title', 'idea-brief'))}",
+        step_name="Idea brief publish",
+    )
+    log_publish_summary = _publish_markdown_with_recovery(
+        msg,
+        markdown_path=log_path,
+        title=f"Idea Pipeline Log - {_slugify(query)[:50] or 'idea-run'}",
+        record_key=f"idea-log-{_slugify(query)[:40] or 'idea-run'}",
+        step_name="Pipeline log publish",
+    )
+
+    response_lines = [
+        pipeline_summary,
+        "",
+        *artifact_publish_summaries,
+        "",
+        f"Selected candidate: {selected.get('title', 'Idea Brief')}",
+        brief_summary,
+        publish_summary,
+        log_publish_summary,
+    ]
+    motivation = selected.get("motivation", "")
+    novelty = selected.get("novelty", "")
+    if motivation:
+        response_lines.extend(["", f"Motivation: {motivation}"])
+    if novelty:
+        response_lines.extend(["", f"Novelty: {novelty}"])
+    return "\n".join(line for line in response_lines if line is not None)
+
+
 def _serve_process_message(
     msg: ChannelMessage,
     *,
@@ -387,6 +832,16 @@ def _serve_process_message(
     console.print(
         f"[dim][{msg.channel_type}] {msg.sender}: {escape(msg.content[:80])}[/dim]"
     )
+
+    if _is_idea_start_command(msg.content):
+        try:
+            response = _handle_idea_start_command(msg, workspace_dir=workspace_dir)
+        except Exception as e:
+            response = f"Error: {e}"
+            console.print(f"[red]Idea route error: {e}[/red]")
+        _set_channel_response(msg.msg_id, response)
+        console.print(f"[dim][{msg.channel_type}] Replied to {msg.sender}[/dim]")
+        return
 
     # -- channel callback helpers (same pattern as interactive.py) --
 

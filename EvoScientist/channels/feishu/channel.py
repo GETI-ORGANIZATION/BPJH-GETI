@@ -240,6 +240,7 @@ class FeishuConfig(BaseChannelConfig):
     webhook_port: int = 9000
     text_chunk_limit: int = 4096
     feishu_domain: str = "https://open.feishu.cn"
+    doc_folder_token: str = ""
 
 
 class FeishuChannel(Channel, WebhookMixin, TokenMixin):

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import uuid
 from collections import OrderedDict
 from dataclasses import dataclass
@@ -86,6 +87,13 @@ def _should_auto_approve(action_requests: list[dict]) -> bool:
     if not action_requests:
         return True
 
+    names = [
+        req.get("name", "") if isinstance(req, dict) else getattr(req, "name", "")
+        for req in action_requests
+    ]
+    if all(name != "execute" for name in names):
+        return True
+
     try:
         from ..config.settings import load_config
 
@@ -102,10 +110,7 @@ def _should_auto_approve(action_requests: list[dict]) -> bool:
         else []
     )
 
-    for req in action_requests:
-        name = (
-            req.get("name", "") if isinstance(req, dict) else getattr(req, "name", "")
-        )
+    for req, name in zip(action_requests, names):
         if name != "execute":
             continue
         args = (
@@ -137,7 +142,7 @@ def _format_approval_prompt(action_requests: list[dict]) -> str:
         else:
             lines.append(f"  {i}. {name}")
     lines.append("")
-    lines.append("Reply: 1=Approve, 2=Reject, 3=Approve all")
+    lines.append("Reply: A=Approve, B=Reject, C=Approve all")
     lines.append("(Auto-reject in 2 min if no reply)")
     return "\n".join(lines)
 
@@ -148,12 +153,22 @@ def _parse_approval_reply(text: str) -> str | None:
     Returns "approve", "reject", "auto", or None if not recognized.
     """
     t = text.strip().lower()
-    if t in ("1", "y", "yes", "approve", "ok"):
-        return "approve"
-    if t in ("2", "n", "no", "reject"):
-        return "reject"
-    if t in ("3", "a", "auto", "approve all"):
+    t = re.sub(r"@\S+", " ", t)
+    t = re.sub(r"\s+", " ", t).strip()
+    compact = t.replace(" ", "")
+    if compact in ("c", "3", "auto", "approveall") or t in ("approve all", "approve-all"):
         return "auto"
+    normalized = re.sub(r"[^a-z0-9]+", " ", t)
+    tokens = [token for token in normalized.split() if token]
+    if len(tokens) >= 2 and tokens[-2:] == ["approve", "all"]:
+        return "auto"
+    for token in reversed(tokens):
+        if token in ("c", "3", "auto", "approveall"):
+            return "auto"
+        if token in ("a", "1", "y", "yes", "approve", "ok"):
+            return "approve"
+        if token in ("b", "2", "n", "no", "reject"):
+            return "reject"
     return None
 
 

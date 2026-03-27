@@ -16,6 +16,7 @@ def create_from_config(config) -> FeishuChannel:
             webhook_port=config.feishu_webhook_port,
             allowed_senders=allowed,
             feishu_domain=config.feishu_domain,
+            doc_folder_token=getattr(config, "feishu_doc_folder_token", ""),
             proxy=proxy,
         )
     )

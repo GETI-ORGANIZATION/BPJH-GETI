@@ -129,6 +129,7 @@ class EvoScientistConfig:
     feishu_allowed_senders: str = ""
     feishu_domain: str = "https://open.feishu.cn"
     feishu_proxy: str = ""
+    feishu_doc_folder_token: str = ""
 
     # WeChat Settings
     wechat_backend: str = "wecom"
@@ -357,6 +358,7 @@ _ENV_MAPPINGS = {
     "custom_anthropic_base_url": "CUSTOM_ANTHROPIC_BASE_URL",
     "ollama_base_url": "OLLAMA_BASE_URL",
     "tavily_api_key": "TAVILY_API_KEY",
+    "feishu_doc_folder_token": "EVOSCIENTIST_FEISHU_DOC_FOLDER_TOKEN",
     "default_mode": "EVOSCIENTIST_DEFAULT_MODE",
     "default_workdir": "EVOSCIENTIST_WORKSPACE_DIR",
     "ui_backend": "EVOSCIENTIST_UI_BACKEND",

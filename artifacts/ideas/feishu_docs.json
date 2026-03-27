@@ -1,0 +1,30 @@
+{
+  "feishu-smoke-test": {
+    "title": "Feishu Smoke Test",
+    "markdown_path": "artifacts/ideas/feishu_smoke_test.md",
+    "document_token": "SmT4dkgQNozhUDxmjfHcWds5nwd",
+    "url": "",
+    "folder_token": "V3Q2fc6YklHQ4Kdij8Qc0BBCngc"
+  },
+  "current-workflow-guide": {
+    "title": "EvoScientist Current Workflow Guide",
+    "markdown_path": "artifacts/ideas/current_workflow_guide.md",
+    "document_token": "DpvhdNtqfof9Nxx9RlZcDO5Unjc",
+    "url": "",
+    "folder_token": "V3Q2fc6YklHQ4Kdij8Qc0BBCngc"
+  },
+  "idea-candidates-multi-instance-image-generation-in-diffu": {
+    "title": "Idea Candidates - multi-instance image generation in diffusion models, trainin",
+    "markdown_path": "artifacts/ideas/runs/20260319-225247-multi-instance-image-generation-in-diffusion-models-training-free-attention/idea_candidates.md",
+    "document_token": "Na9jdnXAYoLlcHxADfoc4V0Lndj",
+    "url": "",
+    "folder_token": "V3Q2fc6YklHQ4Kdij8Qc0BBCngc"
+  },
+  "idea-log-multi-instance-image-generation-in-diffu": {
+    "title": "Idea Pipeline Log - multi-instance image generation in diffusion models, trainin",
+    "markdown_path": "artifacts/ideas/latest_pipeline_log.md",
+    "document_token": "GHvBdEQe0oGdOOxijcMckXqFnAf",
+    "url": "",
+    "folder_token": "V3Q2fc6YklHQ4Kdij8Qc0BBCngc"
+  }
+}

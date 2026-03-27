@@ -1,0 +1,94 @@
+[
+  {
+    "title": "Orthogonal Key-Space Projection for Zero-Shot Multi-Instance Disentanglement",
+    "idea_description": "A training-free method that enforces geometric orthogonality in the cross-attention Key space to prevent instance confusion, complementing existing differential key approaches.",
+    "motivation": "Recent work (Delta-K) identifies that concept omission occurs in the cross-attention Key space. However, simply shifting keys may not suffice if the keys for different instances remain linearly dependent, causing semantic overlap.",
+    "novelty": "Introduces a linear algebra constraint (Gram-Schmidt process or orthogonal projection) to the Key vectors of multi-instance prompts during inference, ensuring mathematically distinct attention basins for each object.",
+    "background": "Diffusion models often suffer from concept omission or blending in multi-instance scenarios. Evidence indicates that operating in the cross-attention Key space is a promising direction for resolving these conflicts without training.",
+    "proposed_method": "During the denoising step, extract the Key vectors $K_i$ for each instance prompt. Apply an orthogonalization procedure such that $K_i^T K_j \\approx 0$ for $i \\neq j$. This forces the attention mechanism to attend to distinct spatial regions, reducing the 'Dominant-vs-Dominated' imbalance identified in recent literature.",
+    "validation_plan": "Generate images with 2-4 instance prompts using Stable Diffusion. Compare standard attention, Delta-K augmentation, and the proposed Orthogonal Key-Space method. Measure CLIP-score for each instance and object detection accuracy (mAP).",
+    "risks": "Enforcing strict orthogonality might disrupt the semantic integrity of the pre-trained latent space, potentially leading to artifacts or unnatural object shapes.",
+    "evidence_urls": [
+      "https://arxiv.org/abs/2603.10210",
+      "https://arxiv.org/abs/2512.20666"
+    ],
+    "research_results": [
+      "Delta-K operates in the shared cross-attention Key space to address omission.",
+      "Dominant-vs-Dominated (DvD) imbalance describes how one concept suppresses others.",
+      "Existing training-free methods often exacerbate unstructured noise."
+    ]
+  },
+  {
+    "title": "Optimal Transport Attention Reallocation for Multi-Instance Dominance Mitigation",
+    "idea_description": "A training-free framework that formulates the multi-instance attention allocation problem as an Optimal Transport (OT) problem to mathematically guarantee balanced semantic distribution.",
+    "motivation": "The 'Dominant-vs-Dominated' phenomenon suggests an uneven distribution of 'attention mass' among instances. Current rescaling methods lack a rigorous mathematical basis for redistributing this mass globally.",
+    "novelty": "Applies Sinkhorn algorithms to solve an entropy-regularized Optimal Transport problem between the spatial distribution of attention maps and a uniform target distribution across multiple instances, ensuring fair generation.",
+    "background": "Multi-instance generation struggles with semantic interference. Evidence shows that one concept token often dominates the generation process, suppressing others.",
+    "proposed_method": "Compute attention maps $A_1, ..., A_n$ for $n$ instances. Define a cost matrix based on spatial overlap. Use an OT solver to find a transport plan that redistributes attention probabilities to minimize overlap and maximize uniform coverage, correcting the DvD imbalance without retraining.",
+    "validation_plan": "Experiments on COCO dataset prompts with multiple objects. Compare the entropy of attention distributions and the Instance Success Rate (ISR). Visualize the transport maps to show how dominance is suppressed.",
+    "risks": "The iterative Sinkhorn algorithm may introduce computational overhead during inference, potentially slowing down the generation process.",
+    "evidence_urls": [
+      "https://arxiv.org/abs/2512.20666"
+    ],
+    "research_results": [
+      "DvD imbalance is a significant issue where one token suppresses others.",
+      "Concept omission is a frequent failure mode in complex scenes.",
+      "DominanceBench has been introduced to systematically analyze these imbalances."
+    ]
+  },
+  {
+    "title": "Game-Theoretic Equilibrium in Joint Attention for Flow Matching",
+    "idea_description": "A training-free intervention modeling multi-instance editing in Flow Matching as a cooperative game, where each instance's attention seeks a Nash Equilibrium to prevent interference.",
+    "motivation": "Recent findings in Flow Matching show that joint attention mechanisms entangle concurrent edits. Viewed through game theory, the 'dominant' concept wins, leading to a suboptimal equilibrium for other instances.",
+    "novelty": "Treats instance-specific attention updates as players in a potential game. Uses regret matching or similar equilibrium-finding algorithms to update attention masks during the velocity field estimation step.",
+    "background": "Flow Matching models offer faster inference but struggle with multi-instance editing due to entangled joint attention.",
+    "proposed_method": "In the Flow Matching formulation, during the velocity estimation $v_t$, separate the joint attention into instance-specific components. Iteratively adjust the query/key projections such that no single instance can unilaterally improve its attention score without reducing the collective welfare (sum of attention scores), resolving the entanglement.",
+    "validation_plan": "Apply to the editing scenarios described in the Flow Matching literature. Measure the preservation of non-edited regions and the success rate of multiple simultaneous edits.",
+    "risks": "Defining the utility function for the 'game' is non-trivial; a poor definition might result in collapsed generations or failure to converge during inference.",
+    "evidence_urls": [
+      "https://arxiv.org/abs/2602.08749"
+    ],
+    "research_results": [
+      "Flow matching models struggle with multi-instance scenarios.",
+      "Joint attention mechanisms entangle concurrent edits.",
+      "Instance-Disentangled Attention is a proposed mechanism to partition attention."
+    ]
+  },
+  {
+    "title": "Spectral Graph Partitioning for Cross-Attention Noise Suppression",
+    "idea_description": "A training-free spectral analysis method to filter unstructured noise in attention maps, addressing the exacerbation of noise mentioned in recent works.",
+    "motivation": "Evidence suggests that existing training-free rescaling methods exacerbate unstructured noise. Spectral graph theory offers tools to separate structured semantic signals (instances) from noise.",
+    "novelty": "Constructs a graph where nodes are spatial tokens and edges are attention similarities. Uses spectral clustering (eigen-decomposition of the graph Laplacian) to identify and isolate coherent semantic regions corresponding to instances.",
+    "background": "Rescaling attention maps is a common training-free technique, but it often amplifies noise, leading to incoherent semantic representations.",
+    "proposed_method": "Construct the affinity matrix $W$ from the cross-attention maps. Compute the Graph Laplacian $L$. The Fiedner vector (second smallest eigenvector) is used to partition the image space into binary masks for two instances. For more instances, recursive partitioning or k-way spectral clustering is applied to clean the attention masks before guidance.",
+    "validation_plan": "Qualitative analysis of noise reduction in attention maps. Quantitative comparison of segmentation accuracy of generated instances against ground truth attention distributions.",
+    "risks": "Eigen-decomposition is computationally expensive for high-resolution feature maps, requiring approximation or downsampling which might lose fine details.",
+    "evidence_urls": [
+      "https://arxiv.org/abs/2603.10210",
+      "https://arxiv.org/search/?query=multi-instance+image+generation+diffusion+attention&searchtype=all&abstracts=show&order=-announced_date_first&size=50"
+    ],
+    "research_results": [
+      "Existing training-free methods exacerbate unstructured noise.",
+      "Coherent semantic representations are often missing in complex scenes.",
+      "Delta-K extracts a differential key to encode missing concepts."
+    ]
+  },
+  {
+    "title": "Min-Max Gradient Normalization for Dominance Elimination",
+    "idea_description": "A training-free gradient modulation technique that enforces a min-max constraint on the attention gradients to prevent any single concept from dominating the diffusion process.",
+    "motivation": "The 'Dominant-vs-Dominated' (DvD) imbalance implies that the gradient updates from one concept overshadow others. A mathematically defined normalization can balance the influence of all concept tokens.",
+    "novelty": "Instead of manipulating attention weights directly, this method projects the gradient of the denoising score matching loss onto a simplex that enforces equal contribution bounds for multi-instance prompts.",
+    "background": "Diffusion models often exhibit a dominance phenomenon where one concept token suppresses others, identified as DvD imbalance.",
+    "proposed_method": "Calculate the gradient $g_i$ with respect to the latent $z_t$ for each instance prompt $i$. Normalize these gradients such that $\\|g_i\\|_2$ is bounded by the min and max of the set $\\{\\|g_j\\|_2\\}_j$. Alternatively, scale gradients so that the variance of their norms is minimized, ensuring no single instance drives the denoising direction excessively.",
+    "validation_plan": "Test on DominanceBench (mentioned in evidence). Monitor the variance of gradient norms across denoising steps and correlate with generation success rates.",
+    "risks": "Artificially flattening gradient norms might slow down convergence or result in 'average' features that lack distinctiveness for any instance.",
+    "evidence_urls": [
+      "https://arxiv.org/abs/2512.20666"
+    ],
+    "research_results": [
+      "DominanceBench is introduced to analyze imbalance causes.",
+      "DvD imbalance is characterized by one token suppressing others.",
+      "Analysis exists from both data and architectural perspectives on this issue."
+    ]
+  }
+]

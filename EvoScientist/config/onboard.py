@@ -41,13 +41,13 @@ WIZARD_STYLE = Style.from_dict(
         "qmark": "fg:#00bcd4 bold",  # Cyan question mark
         "question": "bold",  # Bold question text
         "answer": "fg:#4caf50 bold",  # Green selected answer
-        "pointer": "fg:#4caf50",  # Green pointer (»)
+        "pointer": "fg:#4caf50",  # Green pointer (缂?
         "highlighted": "noreverse bold",  # No background, bold text
-        "selected": "fg:#4caf50 bold",  # Green ● indicator
+        "selected": "fg:#4caf50 bold",  # Green 闂?indicator
         "separator": "fg:#6c6c6c",  # Dim separator
         "disabled": "fg:#858585",  # Dim disabled indicator (-)
         "instruction": "fg:#858585",  # Dim instructions
-        "text": "fg:#858585",  # Dim gray ○ and unselected text
+        "text": "fg:#858585",  # Dim gray 闂?and unselected text
     }
 )
 
@@ -61,18 +61,18 @@ CONFIRM_STYLE = Style.from_dict(
     }
 )
 
-QMARK = "❯"
+QMARK = "?"
 
 # Installed-item indicator style for disabled checkbox choices.
-_INSTALLED_INDICATOR = ("fg:#4caf50", "✓ ")
+_INSTALLED_INDICATOR = ("fg:#4caf50", "闂?")
 
 
 def _checkbox_ask(choices, message: str, **kwargs):
-    """``questionary.checkbox`` that renders disabled items with ✓ instead of ``-``.
+    """``questionary.checkbox`` that renders disabled items with 闂?instead of ``-``.
 
     Temporarily patches the rendering so the hard-coded ``"- "`` prefix for
-    disabled choices is replaced by a green ``"✓ "`` — keeping alignment with
-    the ``○`` indicator of normal choices.
+    disabled choices is replaced by a green ``"闂?"`` 闂?keeping alignment with
+    the ``闂佸磭鍘ч悰鏈?indicator of normal choices.
     """
     from questionary.prompts.common import InquirerControl
 
@@ -261,7 +261,7 @@ def validate_google_key(api_key: str) -> tuple[bool, str]:
         next(iter(pager))  # fetch first model only
         return True, "Valid"
     except StopIteration:
-        # Empty result but request succeeded — key is valid
+        # Empty result but request succeeded 闂?key is valid
         return True, "Valid"
     except Exception as e:
         error_str = str(e).lower()
@@ -336,7 +336,7 @@ def validate_openrouter_key(api_key: str) -> tuple[bool, str]:
 def validate_zhipu_key(api_key: str) -> tuple[bool, str]:
     """Validate a ZhipuAI API key by making a test request.
 
-    Uses the general endpoint for validation — both zhipu and zhipu-code
+    Uses the general endpoint for validation 闂?both zhipu and zhipu-code
     share the same API key, only the base_url differs at runtime.
 
     Returns:
@@ -474,7 +474,7 @@ def validate_ollama_connection(base_url: str) -> tuple[bool, str, list[str]]:
             names = [m.get("name", "?") for m in models]
             if names:
                 preview = ", ".join(names[:5])
-                return True, f"Connected — {len(names)} model(s): {preview}", names
+                return True, f"Connected 闂?{len(names)} model(s): {preview}", names
             return True, "Connected (no models pulled yet)", []
         return False, f"HTTP {resp.status_code}", []
     except Exception as e:
@@ -510,7 +510,7 @@ def _print_step_result(step_name: str, value: str, success: bool = True) -> None
         value: The selected/entered value.
         success: Whether the step was successful (affects icon).
     """
-    icon = "[green]✓[/green]" if success else "[red]✗[/red]"
+    icon = "[green]闂佺繝鐒﹁ぐ?green]" if success else "[red]闂佺繝鐒﹂。?red]"
     console.print(f"  {icon} [bold]{step_name}:[/bold] [cyan]{value}[/cyan]")
 
 
@@ -521,7 +521,7 @@ def _print_step_skipped(step_name: str, reason: str = "kept current") -> None:
         step_name: Name of the step.
         reason: Reason for skipping.
     """
-    console.print(f"  [dim]○ {step_name}: {reason}[/dim]")
+    console.print(f"  [dim]闂?{step_name}: {reason}[/dim]")
 
 
 # =============================================================================
@@ -574,29 +574,29 @@ def _step_provider(config: EvoScientistConfig) -> str:
         Selected provider name.
     """
     choices = [
-        Choice(title="Anthropic (Claude models — API / OAuth)", value="anthropic"),
-        Choice(title="OpenAI (GPT models — API / OAuth)", value="openai"),
+        Choice(title="Anthropic (Claude models 闂?API / OAuth)", value="anthropic"),
+        Choice(title="OpenAI (GPT models 闂?API / OAuth)", value="openai"),
         Choice(title="Google GenAI (Gemini models)", value="google-genai"),
-        Choice(title="NVIDIA (third party — limited free requests)", value="nvidia"),
+        Choice(title="NVIDIA (third party 闂?limited free requests)", value="nvidia"),
         Choice(
-            title="SiliconFlow (third party — GLM, Kimi, MiniMax, etc.)",
+            title="SiliconFlow (third party 闂?GLM, Kimi, MiniMax, etc.)",
             value="siliconflow",
         ),
         Choice(
-            title="OpenRouter (third party — Grok, Gemini, Qwen, etc.)",
+            title="OpenRouter (third party 闂?Grok, Gemini, Qwen, etc.)",
             value="openrouter",
         ),
-        Choice(title="ZhipuAI (智谱 — GLM models)", value="zhipu"),
+        Choice(title="ZhipuAI (闂佸搫鎳樼紓姘潩?闂?GLM models)", value="zhipu"),
         Choice(
-            title="ZhipuAI CodePlan (智谱代码计划 — GLM models for coding)",
+            title="ZhipuAI CodePlan (闂佸搫鎳樼紓姘潩閵婏妇顩烽柨婵嗘川閸ㄦ娊鎮规担娴嬪亾閸愯尙浜?闂?GLM models for coding)",
             value="zhipu-code",
         ),
         Choice(
-            title="Volcengine (火山引擎 — Doubao models)",
+            title="Volcengine (闂佽娴氶崑鍕礌濡も偓椤曪綁寮撮悢鍛婂劎 闂?Doubao models)",
             value="volcengine",
         ),
         Choice(
-            title="DashScope (阿里云 — Qwen models)",
+            title="DashScope (闂傚倸鍟锟犲闯闁垮顩?闂?Qwen models)",
             value="dashscope",
         ),
         Choice(title="Ollama (local models)", value="ollama"),
@@ -744,7 +744,7 @@ def _prompt_and_validate_api_key(
         else:
             console.print(f"\r  [red]\u2717 {msg}[/red]      ")
             if not new_key:
-                # Existing key is invalid — warn but keep (user didn't change it)
+                # Existing key is invalid 闂?warn but keep (user didn't change it)
                 return None
             save_anyway = questionary.confirm(
                 "Save anyway?",
@@ -785,7 +785,7 @@ def _prompt_ccproxy_port(config: EvoScientistConfig) -> None:
 
     setattr(config, "ccproxy_port", ccproxy_port)
     console.print(
-        f"  [green]✓ ccproxy will run on http://127.0.0.1:{ccproxy_port}[/green]"
+        f"  [green]闂?ccproxy will run on http://127.0.0.1:{ccproxy_port}[/green]"
     )
 
 
@@ -807,7 +807,7 @@ def _run_ccproxy_login(provider: str, label: str) -> None:
                 break
         authed, msg = check_ccproxy_auth(provider)
         if authed:
-            console.print(f"  [green]✓ {label}: {msg}[/green]")
+            console.print(f"  [green]闂?{label}: {msg}[/green]")
         else:
             console.print(f"  [red]Authentication failed: {msg}[/red]")
     except subprocess.TimeoutExpired:
@@ -832,7 +832,7 @@ def _step_anthropic_auth_mode(config: EvoScientistConfig) -> str:
     choices = [
         Choice(title="API Key (direct Anthropic access)", value="api_key"),
         Choice(
-            title="Claude Code OAuth (via ccproxy — no API key needed)"
+            title="Claude Code OAuth (via ccproxy 闂?no API key needed)"
             + (
                 ""
                 if ccproxy_available
@@ -859,7 +859,7 @@ def _step_anthropic_auth_mode(config: EvoScientistConfig) -> str:
         raise KeyboardInterrupt()
 
     if auth_mode == "oauth" and not ccproxy_available:
-        console.print("  [yellow]✗ ccproxy not installed[/yellow]")
+        console.print("  [yellow]闂?ccproxy not installed[/yellow]")
         console.print()
         install = questionary.confirm(
             'Install ccproxy now? (pip install "evoscientist[oauth]")',
@@ -872,7 +872,7 @@ def _step_anthropic_auth_mode(config: EvoScientistConfig) -> str:
         if install:
             console.print()
             if _install_ccproxy():
-                console.print("  [green]✓ ccproxy installed successfully.[/green]")
+                console.print("  [green]闂?ccproxy installed successfully.[/green]")
             else:
                 console.print("  [yellow]Falling back to API key mode.[/yellow]")
                 return "api_key"
@@ -889,7 +889,7 @@ def _step_anthropic_auth_mode(config: EvoScientistConfig) -> str:
     if auth_mode in ("oauth", "auto"):
         authed, msg = check_ccproxy_auth()
         if authed:
-            console.print(f"  [green]✓ OAuth: {msg}[/green]")
+            console.print(f"  [green]闂?OAuth: {msg}[/green]")
             relogin = questionary.confirm(
                 "Re-authenticate to refresh credentials?",
                 default=False,
@@ -928,7 +928,7 @@ def _step_openai_auth_mode(config: EvoScientistConfig) -> str:
     choices = [
         Choice(title="API Key (direct OpenAI access)", value="api_key"),
         Choice(
-            title="Codex OAuth (via ccproxy — no API key needed)"
+            title="Codex OAuth (via ccproxy 闂?no API key needed)"
             + (
                 ""
                 if ccproxy_available
@@ -955,7 +955,7 @@ def _step_openai_auth_mode(config: EvoScientistConfig) -> str:
         raise KeyboardInterrupt()
 
     if auth_mode == "oauth" and not ccproxy_available:
-        console.print("  [yellow]✗ ccproxy not installed[/yellow]")
+        console.print("  [yellow]闂?ccproxy not installed[/yellow]")
         console.print()
         install = questionary.confirm(
             'Install ccproxy now? (pip install "evoscientist[oauth]")',
@@ -968,7 +968,7 @@ def _step_openai_auth_mode(config: EvoScientistConfig) -> str:
         if install:
             console.print()
             if _install_ccproxy():
-                console.print("  [green]✓ ccproxy installed successfully.[/green]")
+                console.print("  [green]闂?ccproxy installed successfully.[/green]")
             else:
                 console.print("  [yellow]Falling back to API key mode.[/yellow]")
                 return "api_key"
@@ -983,7 +983,7 @@ def _step_openai_auth_mode(config: EvoScientistConfig) -> str:
         _prompt_ccproxy_port(config)
         authed, msg = check_ccproxy_auth("codex")
         if authed:
-            console.print(f"  [green]✓ Codex OAuth: {msg}[/green]")
+            console.print(f"  [green]闂?Codex OAuth: {msg}[/green]")
             relogin = questionary.confirm(
                 "Re-authenticate to refresh credentials?",
                 default=False,
@@ -1140,10 +1140,10 @@ def _step_model(
             if selected != _CUSTOM_SENTINEL:
                 return selected
 
-        # No detected models (server down or empty) — direct text input
+        # No detected models (server down or empty) 闂?direct text input
         if not ollama_detected_models:
             console.print(
-                "  [dim]No models detected — type the model name you plan to pull.[/dim]"
+                "  [dim]No models detected 闂?type the model name you plan to pull.[/dim]"
             )
         model = questionary.text(
             "Model name:",
@@ -1311,12 +1311,12 @@ def _step_thinking(config: EvoScientistConfig) -> bool:
 
 
 _RECOMMENDED_SKILLS = [
-    # ── Official (EvoScientist) ──
+    # 闂佸啿鍘滈崑鎾绘煃閸忓浜?Official (EvoScientist) 闂佸啿鍘滈崑鎾绘煃閸忓浜?
     {
-        "label": "EvoSci Skills  (optimized for EvoScientist — paper planning, writing, review, etc.) 👈 Recommended",
+        "label": "EvoSci Skills  (optimized for EvoScientist 闂?paper planning, writing, review, etc.) 濡絽鍟崯?Recommended",
         "source": "EvoScientist/EvoSkills@skills",
     },
-    # ── Third-party (K-Dense) ──
+    # 闂佸啿鍘滈崑鎾绘煃閸忓浜?Third-party (K-Dense) 闂佸啿鍘滈崑鎾绘煃閸忓浜?
     {
         "label": "Scientific Skills  (147 research & experiment skills, third party by K-Dense)",
         "source": "K-Dense-AI/claude-scientific-skills@scientific-skills",
@@ -1325,17 +1325,17 @@ _RECOMMENDED_SKILLS = [
         "label": "Scientific Writer  (23 writing, review & presentation skills, third party by K-Dense)",
         "source": "K-Dense-AI/claude-scientific-writer@skills",
     },
-    # ── Third-party (Orchestra Research) ──
+    # 闂佸啿鍘滈崑鎾绘煃閸忓浜?Third-party (Orchestra Research) 闂佸啿鍘滈崑鎾绘煃閸忓浜?
     {
         "label": "AI Research Skills  (85 skills for training, evaluation, deployment, etc., third party by Orchestra Research)",
         "source": "Orchestra-Research/AI-Research-SKILLs",
     },
-    # ── Third-party (Anthropic) ──
+    # 闂佸啿鍘滈崑鎾绘煃閸忓浜?Third-party (Anthropic) 闂佸啿鍘滈崑鎾绘煃閸忓浜?
     {
         "label": "Anthropic Skills  (co-authoring, design, etc., third party by Anthropic)",
         "source": "anthropics/skills@skills",
     },
-    # ── Third-party (HuggingFace) ──
+    # 闂佸啿鍘滈崑鎾绘煃閸忓浜?Third-party (HuggingFace) 闂佸啿鍘滈崑鎾绘煃閸忓浜?
     {
         "label": "HuggingFace Skills  (dataset creation, model training & evaluation, third party by HuggingFace)",
         "source": "huggingface/skills@skills",
@@ -1406,13 +1406,13 @@ def _install_node(method: str, command: str) -> bool:
         )
         return proc.returncode == 0
     except FileNotFoundError:
-        console.print(f"  [red]✗ {method} not found[/red]")
+        console.print(f"  [red]闂?{method} not found[/red]")
         return False
     except subprocess.TimeoutExpired:
-        console.print("  [red]✗ Installation timed out[/red]")
+        console.print("  [red]闂?Installation timed out[/red]")
         return False
     except Exception as e:
-        console.print(f"  [red]✗ Installation failed: {e}[/red]")
+        console.print(f"  [red]闂?Installation failed: {e}[/red]")
         return False
 
 
@@ -1428,7 +1428,7 @@ def _ensure_npx(reason: str) -> bool:
     if _check_npx():
         return True
 
-    console.print(f"  [yellow]✗ npx not found — {reason}[/yellow]")
+    console.print(f"  [yellow]闂?npx not found 闂?{reason}[/yellow]")
     method, command = _detect_node_install_method()
 
     if method != "manual":
@@ -1444,14 +1444,14 @@ def _ensure_npx(reason: str) -> bool:
             console.print("  [dim]Installing Node.js...[/dim]")
             if _install_node(method, command):
                 if _check_npx():
-                    console.print("  [green]✓ npx now available[/green]")
+                    console.print("  [green]闂?npx now available[/green]")
                     return True
                 else:
                     console.print(
-                        "  [yellow]✗ npx still not found after install[/yellow]"
+                        "  [yellow]闂?npx still not found after install[/yellow]"
                     )
             else:
-                console.print("  [red]✗ Installation failed[/red]")
+                console.print("  [red]闂?Installation failed[/red]")
     else:
         console.print(f"  [dim]Install Node.js: {command}[/dim]")
 
@@ -1463,7 +1463,7 @@ def _step_skills() -> list[str]:
 
     Shows checkbox first. Already-installed skills are shown as disabled
     so users don't accidentally reinstall them. If user selects nothing,
-    checks npx as an easter egg — confirms skill discovery is available,
+    checks npx as an easter egg 闂?confirms skill discovery is available,
     or offers to install Node.js if missing.
 
     Returns:
@@ -1504,7 +1504,7 @@ def _step_skills() -> list[str]:
     )
     if all_installed:
         console.print(
-            "  [green]✓ All recommended skills are already installed.[/green]"
+            "  [green]闂?All recommended skills are already installed.[/green]"
         )
         return []
 
@@ -1516,10 +1516,10 @@ def _step_skills() -> list[str]:
     if not selected:
         # Verify skill discovery environment
         console.print("  [dim]Checking skill discovery environment...[/dim]")
-        has_npx = _ensure_npx("skill discovery requires Node.js")
+        has_npx = _check_npx()
         if has_npx:
-            _print_step_skipped("Skills", "none selected — good choice!")
-            console.print("  [green]✓ npx found — skill discovery available[/green]")
+            _print_step_skipped("Skills", "none selected 闂?good choice!")
+            console.print("  [green]闂?npx found 闂?skill discovery available[/green]")
             console.print(
                 "  [yellow bold]* Less is more[/yellow bold] [dim](EvoScientist can discover and install skills on its own)[/dim]"
             )
@@ -1540,16 +1540,16 @@ def _step_skills() -> list[str]:
                 installed.append(source)
             else:
                 _print_step_result(
-                    "Skill", f"{label} — {result.get('error', 'failed')}", success=False
+                    "Skill", f"{label} 闂?{result.get('error', 'failed')}", success=False
                 )
         except Exception as e:
-            _print_step_result("Skill", f"{label} — {e}", success=False)
+            _print_step_result("Skill", f"{label} 闂?{e}", success=False)
 
     return installed
 
 
 _RECOMMENDED_MCP_SERVERS = [
-    # ── Built-in ──
+    # 闂佸啿鍘滈崑鎾绘煃閸忓浜?Built-in 闂佸啿鍘滈崑鎾绘煃閸忓浜?
     {
         "label": "Sequential Thinking  (structured reasoning for non-reasoning models)",
         "name": "sequential-thinking",
@@ -1561,9 +1561,9 @@ _RECOMMENDED_MCP_SERVERS = [
         "name": "docs-langchain",
         "url": "https://docs.langchain.com/mcp",
     },
-    # ── Search & Knowledge ──
+    # 闂佸啿鍘滈崑鎾绘煃閸忓浜?Search & Knowledge 闂佸啿鍘滈崑鎾绘煃閸忓浜?
     {
-        "label": "Perplexity  (AI-powered web search — requires PERPLEXITY_API_KEY)",
+        "label": "Perplexity  (AI-powered web search 闂?requires PERPLEXITY_API_KEY)",
         "name": "perplexity",
         "command": "npx",
         "args": ["-y", "@perplexity-ai/mcp-server"],
@@ -1572,16 +1572,16 @@ _RECOMMENDED_MCP_SERVERS = [
         "env_hint": "export PERPLEXITY_API_KEY=pplx-... (get one at perplexity.ai/settings/api)",
     },
     {
-        "label": "Context7  (fast documentation lookup — API key unlocks higher rate limits)",
+        "label": "Context7  (fast documentation lookup 闂?API key unlocks higher rate limits)",
         "name": "context7",
         "command": "npx",
         "args": ["-y", "@upstash/context7-mcp"],
         "env": {"CONTEXT7_API_KEY": "${CONTEXT7_API_KEY}"},
         "env_key": "CONTEXT7_API_KEY",
-        "env_hint": "export CONTEXT7_API_KEY=... (optional — unlocks higher rate limits)",
+        "env_hint": "export CONTEXT7_API_KEY=... (optional 闂?unlocks higher rate limits)",
         "env_optional": True,
     },
-    # ── Research ──
+    # 闂佸啿鍘滈崑鎾绘煃閸忓浜?Research 闂佸啿鍘滈崑鎾绘煃閸忓浜?
     {
         "label": "DeepWiki  (search & read GitHub repo documentation)",
         "name": "deepwiki",
@@ -1677,7 +1677,7 @@ def _step_mcp_servers() -> list[str]:
     )
     if all_installed:
         console.print(
-            "  [green]✓ All recommended MCP servers are already configured.[/green]"
+            "  [green]闂?All recommended MCP servers are already configured.[/green]"
         )
         return []
 
@@ -1726,7 +1726,7 @@ def _step_mcp_servers() -> list[str]:
                 if is_optional:
                     console.print(f"  [dim]{hint}[/dim]")
                 else:
-                    console.print(f"  [yellow]⚠ Requires {env_key}[/yellow]")
+                    console.print(f"  [yellow]闂?Requires {env_key}[/yellow]")
                     console.print(f"  [dim]{hint}[/dim]")
                     if not os.environ.get(env_key):
                         console.print(
@@ -1740,7 +1740,7 @@ def _step_mcp_servers() -> list[str]:
                 if not _install_pip_package(pip_pkg):
                     _print_step_result(
                         "MCP",
-                        f"{name} — {_pip_install_hint()} {pip_pkg} failed",
+                        f"{name} 闂?{_pip_install_hint()} {pip_pkg} failed",
                         success=False,
                     )
                     continue
@@ -1759,7 +1759,7 @@ def _step_mcp_servers() -> list[str]:
             _print_step_result("MCP", f"{name}")
             installed.append(name)
         except Exception as e:
-            _print_step_result("MCP", f"{name} — {e}", success=False)
+            _print_step_result("MCP", f"{name} 闂?{e}", success=False)
 
     return installed
 
@@ -1826,7 +1826,7 @@ def _install_ccproxy() -> bool:
 
     ok = _install_pip_package("evoscientist[oauth]")
     if not ok:
-        console.print("  [red]✗ Installation failed.[/red]")
+        console.print("  [red]闂?Installation failed.[/red]")
         return False
     return is_ccproxy_available()
 
@@ -1846,14 +1846,14 @@ def _install_imsg() -> bool:
         )
         return proc.returncode == 0
     except FileNotFoundError:
-        console.print("  [red]✗ Homebrew not found[/red]")
+        console.print("  [red]闂?Homebrew not found[/red]")
         console.print("  [dim]Install Homebrew first: https://brew.sh[/dim]")
         return False
     except subprocess.TimeoutExpired:
-        console.print("  [red]✗ Installation timed out[/red]")
+        console.print("  [red]闂?Installation timed out[/red]")
         return False
     except Exception as e:
-        console.print(f"  [red]✗ Installation failed: {e}[/red]")
+        console.print(f"  [red]闂?Installation failed: {e}[/red]")
         return False
 
 
@@ -1868,15 +1868,15 @@ def _setup_imessage() -> bool:
     valid, msg = validate_imessage()
 
     if valid:
-        console.print(f"  [green]✓ {msg}[/green]")
+        console.print(f"  [green]闂?{msg}[/green]")
         return True
 
     if msg == "iMessage requires macOS":
-        console.print(f"  [red]✗ {msg}[/red]")
+        console.print(f"  [red]闂?{msg}[/red]")
         return False
 
     if msg == "not_installed":
-        console.print("  [yellow]✗ imsg CLI not installed[/yellow]")
+        console.print("  [yellow]闂?imsg CLI not installed[/yellow]")
         console.print()
 
         # Step 2: Offer to install
@@ -1897,10 +1897,10 @@ def _setup_imessage() -> bool:
                 # Re-validate after install
                 valid, msg = validate_imessage()
                 if valid:
-                    console.print(f"  [green]✓ {msg}[/green]")
+                    console.print(f"  [green]闂?{msg}[/green]")
                     return True
                 else:
-                    console.print(f"  [red]✗ {msg}[/red]")
+                    console.print(f"  [red]闂?{msg}[/red]")
                     return False
             else:
                 return False
@@ -1911,7 +1911,7 @@ def _setup_imessage() -> bool:
             return False
     else:
         # RPC not supported or other issue
-        console.print(f"  [red]✗ {msg}[/red]")
+        console.print(f"  [red]闂?{msg}[/red]")
         return False
 
 
@@ -2077,7 +2077,7 @@ def _step_channels(config: EvoScientistConfig) -> dict[str, object]:
 
     for ch_name in selected:
         _, display, required_fields, import_check, pip_extra = _ch_lookup[ch_name]
-        console.print(f"\n  [bold cyan]── {display} ──[/bold cyan]")
+        console.print(f"\n  [bold cyan]闂佸啿鍘滈崑鎾绘煃閸忓浜?{display} 闂佸啿鍘滈崑鎾绘煃閸忓浜綶/bold cyan]")
 
         # Check pip dependency before proceeding
         if import_check:
@@ -2086,7 +2086,7 @@ def _step_channels(config: EvoScientistConfig) -> dict[str, object]:
                 __import__(import_check)
                 _pkg_ready = True
             except ImportError:
-                console.print("  [yellow]✗ Required package not installed.[/yellow]")
+                console.print("  [yellow]闂?Required package not installed.[/yellow]")
                 # Determine packages to install
                 _pip_pkgs = _CHANNEL_PIP_DEPS.get(pip_extra, []) if pip_extra else []
                 _pkg_display = (
@@ -2112,17 +2112,17 @@ def _step_channels(config: EvoScientistConfig) -> dict[str, object]:
                         # Verify the import actually works now
                         try:
                             __import__(import_check)
-                            console.print("  [green]✓ Installed successfully.[/green]")
+                            console.print("  [green]闂?Installed successfully.[/green]")
                             _pkg_ready = True
                         except ImportError:
                             console.print(
-                                "  [red]✗ Package installed but import failed.[/red]"
+                                "  [red]闂?Package installed but import failed.[/red]"
                             )
                             console.print(
                                 "  [dim]Try restarting and running:[/dim] evosci channel setup"
                             )
                     else:
-                        console.print("  [red]✗ Installation failed.[/red]")
+                        console.print("  [red]闂?Installation failed.[/red]")
                         console.print(
                             f"  [dim]Run manually:[/dim] {_pip_install_hint()} {_pkg_display}"
                         )
@@ -2215,7 +2215,7 @@ def _step_channels(config: EvoScientistConfig) -> dict[str, object]:
 
     # --- Common prompt: send thinking (shown when any channel is enabled) ---
     if enabled_channels:
-        console.print("\n  [bold cyan]── Channel Settings ──[/bold cyan]")
+        console.print("\n  [bold cyan]闂佸啿鍘滈崑鎾绘煃閸忓浜?Channel Settings 闂佸啿鍘滈崑鎾绘煃閸忓浜綶/bold cyan]")
         thinking_choices = [
             Choice(title="On (forward model reasoning)", value=True),
             Choice(title="Off (only send final responses)", value=False),
@@ -2242,10 +2242,13 @@ def _probe_channel(
     ch_name: str,
     config: EvoScientistConfig,
     updates: dict[str, object],
-) -> None:
+) -> bool:
     """Run the probe for a channel type and print the result.
 
     Non-fatal: prints a warning on failure but does not prevent enabling.
+
+    Returns:
+        True if validation passes; otherwise False.
     """
     import asyncio
 
@@ -2355,17 +2358,20 @@ def _probe_channel(
 
         ok, detail = loop.run_until_complete(_run())
         if ok:
-            console.print(f"  [green]✓ {detail}[/green]")
+            console.print(f"  [green]闂?{detail}[/green]")
+            return True
         else:
-            console.print(f"  [yellow]⚠ {detail}[/yellow]")
+            console.print(f"  [yellow]闂?{detail}[/yellow]")
             console.print(
-                "  [dim]Channel will still be enabled — check credentials later.[/dim]"
+                "  [dim]Channel will still be enabled 闂?check credentials later.[/dim]"
             )
+            return False
     except Exception as e:
-        console.print(f"  [yellow]⚠ Could not validate: {e}[/yellow]")
+        console.print(f"  [yellow]闂?Could not validate: {e}[/yellow]")
         console.print(
-            "  [dim]Channel will still be enabled — check credentials later.[/dim]"
+            "  [dim]Channel will still be enabled 闂?check credentials later.[/dim]"
         )
+        return False
 
 
 # =============================================================================
@@ -2386,13 +2392,13 @@ def render_progress(current_step: int, completed: set[int]) -> Panel:
     lines = []
     for i, step_name in enumerate(STEPS):
         if i in completed:
-            icon = Text("●", style="green bold")
+            icon = Text("[x]", style="green bold")
             label = Text(f" {step_name}", style="green")
         elif i == current_step:
-            icon = Text("◉", style="cyan bold")
+            icon = Text(">", style="cyan bold")
             label = Text(f" {step_name}", style="cyan bold")
         else:
-            icon = Text("○", style="dim")
+            icon = Text("o", style="dim")
             label = Text(f" {step_name}", style="dim")
 
         line = Text()
@@ -2408,7 +2414,7 @@ def render_progress(current_step: int, completed: set[int]) -> Panel:
                 connector_style = "cyan"
             else:
                 connector_style = "dim"
-            lines.append(Text("│", style=connector_style))
+            lines.append(Text("|", style=connector_style))
 
     # Join all lines with newlines
     content = Text("\n").join(lines)
@@ -2462,7 +2468,7 @@ def run_onboard(skip_validation: bool = False) -> bool:
             ollama_url, ollama_detected_models = _step_ollama_base_url(config)
             config.ollama_base_url = ollama_url
 
-        # Step 2b: Auth mode (Anthropic or OpenAI — API key vs OAuth)
+        # Step 2b: Auth mode (Anthropic or OpenAI 闂?API key vs OAuth)
         if provider == "anthropic":
             auth_mode = _step_anthropic_auth_mode(config)
             config.anthropic_auth_mode = auth_mode
@@ -2475,8 +2481,8 @@ def run_onboard(skip_validation: bool = False) -> bool:
             config.anthropic_auth_mode = "api_key"
             config.openai_auth_mode = "api_key"
 
-        # Step 2c: Provider API Key (skip for Ollama — no key needed,
-        # and for Anthropic/OpenAI pure OAuth — key provided by ccproxy)
+        # Step 2c: Provider API Key (skip for Ollama 闂?no key needed,
+        # and for Anthropic/OpenAI pure OAuth 闂?key provided by ccproxy)
         _PROVIDER_KEY_ATTR = {
             "anthropic": "anthropic_api_key",
             "nvidia": "nvidia_api_key",
@@ -2551,8 +2557,8 @@ def run_onboard(skip_validation: bool = False) -> bool:
         if save:
             save_config(config)
             console.print()
-            console.print("[green]✓ Configuration saved![/green]")
-            console.print(f"[dim]  → {get_config_path()}[/dim]")
+            console.print("[green]闂?Configuration saved![/green]")
+            console.print(f"[dim]  闂?{get_config_path()}[/dim]")
             console.print()
             return True
         else:

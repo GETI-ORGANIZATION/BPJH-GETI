@@ -32,6 +32,16 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "get_system_prompt": (".prompts", "get_system_prompt"),
     "RESEARCHER_INSTRUCTIONS": (".prompts", "RESEARCHER_INSTRUCTIONS"),
     # Tools
+    "build_idea_brief": (".tools", "build_idea_brief"),
+    "collect_sources": (".tools", "collect_sources"),
+    "extract_claims": (".tools", "extract_claims"),
+    "parse_idea_request": (".tools", "parse_idea_request"),
+    "publish_idea_brief_to_feishu_doc": (
+        ".tools",
+        "publish_idea_brief_to_feishu_doc",
+    ),
+    "read_paper_source": (".tools", "read_paper_source"),
+    "run_idea_pipeline": (".tools", "run_idea_pipeline"),
     "tavily_search": (".tools", "tavily_search"),
     "think_tool": (".tools", "think_tool"),
     # Sessions

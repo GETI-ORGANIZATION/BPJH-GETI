@@ -402,20 +402,29 @@ class TestConsumerHitlHelpers:
     def test_parse_approval_approve(self):
         from EvoScientist.channels.consumer import _parse_approval_reply
 
-        for text in ("1", "y", "yes", "approve", "ok", " 1 ", "  Y  "):
+        for text in ("1", "a", "y", "yes", "approve", "ok", " 1 ", "  A  ", "@bot A"):
             assert _parse_approval_reply(text) == "approve", f"Failed for: {text!r}"
 
     def test_parse_approval_reject(self):
         from EvoScientist.channels.consumer import _parse_approval_reply
 
-        for text in ("2", "n", "no", "reject"):
+        for text in ("2", "b", "n", "no", "reject", "@bot B"):
             assert _parse_approval_reply(text) == "reject", f"Failed for: {text!r}"
 
     def test_parse_approval_auto(self):
         from EvoScientist.channels.consumer import _parse_approval_reply
 
-        for text in ("3", "a", "auto", "approve all"):
+        for text in ("3", "c", "auto", "approve all", "@bot C"):
             assert _parse_approval_reply(text) == "auto", f"Failed for: {text!r}"
+
+    def test_parse_approval_with_quoted_prompt_suffix(self):
+        from EvoScientist.channels.consumer import _parse_approval_reply
+
+        text = (
+            "⚠️ Approval Required 1. execute: ls -la /artifacts/ideas/x.md "
+            "Reply: A=Approve, B=Reject, C=Approve all @bot A"
+        )
+        assert _parse_approval_reply(text) == "approve"
 
     def test_parse_approval_unrecognized(self):
         from EvoScientist.channels.consumer import _parse_approval_reply
@@ -435,8 +444,8 @@ class TestConsumerHitlHelpers:
         assert "Approval Required" in prompt
         assert "execute" in prompt
         assert "ls -la" in prompt
-        assert "1=Approve" in prompt
-        assert "2=Reject" in prompt
+        assert "A=Approve" in prompt
+        assert "B=Reject" in prompt
 
     def test_format_approval_prompt_multiple(self):
         from EvoScientist.channels.consumer import _format_approval_prompt

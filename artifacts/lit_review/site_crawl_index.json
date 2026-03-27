@@ -1,0 +1,118 @@
+{
+  "site_urls": [
+    "https://arxiv.org/search/?query=multi-instance+image+generation+diffusion+attention&searchtype=all&abstracts=show&order=-announced_date_first&size=50"
+  ],
+  "keywords": [
+    "novel and with good math properties",
+    "low-cost experiments"
+  ],
+  "sites": [
+    {
+      "site_url": "https://arxiv.org/search/?query=multi-instance+image+generation+diffusion+attention&searchtype=all&abstracts=show&order=-announced_date_first&size=50",
+      "visited_pages": [
+        "https://arxiv.org/search/?query=multi-instance+image+generation+diffusion+attention&searchtype=all&abstracts=show&order=-announced_date_first&size=50"
+      ],
+      "article_count": 6,
+      "articles": [
+        {
+          "site_url": "https://arxiv.org/search/?query=multi-instance+image+generation+diffusion+attention&searchtype=all&abstracts=show&order=-announced_date_first&size=50",
+          "discovered_from": "https://arxiv.org/search/?query=multi-instance+image+generation+diffusion+attention&searchtype=all&abstracts=show&order=-announced_date_first&size=50",
+          "title": "arXiv:2603.10210",
+          "url": "https://arxiv.org/abs/2603.10210",
+          "source_type": "webpage",
+          "relevance_score": 0.0
+        },
+        {
+          "site_url": "https://arxiv.org/search/?query=multi-instance+image+generation+diffusion+attention&searchtype=all&abstracts=show&order=-announced_date_first&size=50",
+          "discovered_from": "https://arxiv.org/search/?query=multi-instance+image+generation+diffusion+attention&searchtype=all&abstracts=show&order=-announced_date_first&size=50",
+          "title": "pdf",
+          "url": "https://arxiv.org/pdf/2603.10210",
+          "source_type": "webpage",
+          "relevance_score": 0.0
+        },
+        {
+          "site_url": "https://arxiv.org/search/?query=multi-instance+image+generation+diffusion+attention&searchtype=all&abstracts=show&order=-announced_date_first&size=50",
+          "discovered_from": "https://arxiv.org/search/?query=multi-instance+image+generation+diffusion+attention&searchtype=all&abstracts=show&order=-announced_date_first&size=50",
+          "title": "arXiv:2602.08749",
+          "url": "https://arxiv.org/abs/2602.08749",
+          "source_type": "webpage",
+          "relevance_score": 0.0
+        },
+        {
+          "site_url": "https://arxiv.org/search/?query=multi-instance+image+generation+diffusion+attention&searchtype=all&abstracts=show&order=-announced_date_first&size=50",
+          "discovered_from": "https://arxiv.org/search/?query=multi-instance+image+generation+diffusion+attention&searchtype=all&abstracts=show&order=-announced_date_first&size=50",
+          "title": "pdf",
+          "url": "https://arxiv.org/pdf/2602.08749",
+          "source_type": "webpage",
+          "relevance_score": 0.0
+        },
+        {
+          "site_url": "https://arxiv.org/search/?query=multi-instance+image+generation+diffusion+attention&searchtype=all&abstracts=show&order=-announced_date_first&size=50",
+          "discovered_from": "https://arxiv.org/search/?query=multi-instance+image+generation+diffusion+attention&searchtype=all&abstracts=show&order=-announced_date_first&size=50",
+          "title": "arXiv:2512.20666",
+          "url": "https://arxiv.org/abs/2512.20666",
+          "source_type": "webpage",
+          "relevance_score": 0.0
+        },
+        {
+          "site_url": "https://arxiv.org/search/?query=multi-instance+image+generation+diffusion+attention&searchtype=all&abstracts=show&order=-announced_date_first&size=50",
+          "discovered_from": "https://arxiv.org/search/?query=multi-instance+image+generation+diffusion+attention&searchtype=all&abstracts=show&order=-announced_date_first&size=50",
+          "title": "pdf",
+          "url": "https://arxiv.org/pdf/2512.20666",
+          "source_type": "webpage",
+          "relevance_score": 0.0
+        }
+      ]
+    }
+  ],
+  "articles": [
+    {
+      "site_url": "https://arxiv.org/search/?query=multi-instance+image+generation+diffusion+attention&searchtype=all&abstracts=show&order=-announced_date_first&size=50",
+      "discovered_from": "https://arxiv.org/search/?query=multi-instance+image+generation+diffusion+attention&searchtype=all&abstracts=show&order=-announced_date_first&size=50",
+      "title": "arXiv:2603.10210",
+      "url": "https://arxiv.org/abs/2603.10210",
+      "source_type": "webpage",
+      "relevance_score": 0.0
+    },
+    {
+      "site_url": "https://arxiv.org/search/?query=multi-instance+image+generation+diffusion+attention&searchtype=all&abstracts=show&order=-announced_date_first&size=50",
+      "discovered_from": "https://arxiv.org/search/?query=multi-instance+image+generation+diffusion+attention&searchtype=all&abstracts=show&order=-announced_date_first&size=50",
+      "title": "pdf",
+      "url": "https://arxiv.org/pdf/2603.10210",
+      "source_type": "webpage",
+      "relevance_score": 0.0
+    },
+    {
+      "site_url": "https://arxiv.org/search/?query=multi-instance+image+generation+diffusion+attention&searchtype=all&abstracts=show&order=-announced_date_first&size=50",
+      "discovered_from": "https://arxiv.org/search/?query=multi-instance+image+generation+diffusion+attention&searchtype=all&abstracts=show&order=-announced_date_first&size=50",
+      "title": "arXiv:2602.08749",
+      "url": "https://arxiv.org/abs/2602.08749",
+      "source_type": "webpage",
+      "relevance_score": 0.0
+    },
+    {
+      "site_url": "https://arxiv.org/search/?query=multi-instance+image+generation+diffusion+attention&searchtype=all&abstracts=show&order=-announced_date_first&size=50",
+      "discovered_from": "https://arxiv.org/search/?query=multi-instance+image+generation+diffusion+attention&searchtype=all&abstracts=show&order=-announced_date_first&size=50",
+      "title": "pdf",
+      "url": "https://arxiv.org/pdf/2602.08749",
+      "source_type": "webpage",
+      "relevance_score": 0.0
+    },
+    {
+      "site_url": "https://arxiv.org/search/?query=multi-instance+image+generation+diffusion+attention&searchtype=all&abstracts=show&order=-announced_date_first&size=50",
+      "discovered_from": "https://arxiv.org/search/?query=multi-instance+image+generation+diffusion+attention&searchtype=all&abstracts=show&order=-announced_date_first&size=50",
+      "title": "arXiv:2512.20666",
+      "url": "https://arxiv.org/abs/2512.20666",
+      "source_type": "webpage",
+      "relevance_score": 0.0
+    },
+    {
+      "site_url": "https://arxiv.org/search/?query=multi-instance+image+generation+diffusion+attention&searchtype=all&abstracts=show&order=-announced_date_first&size=50",
+      "discovered_from": "https://arxiv.org/search/?query=multi-instance+image+generation+diffusion+attention&searchtype=all&abstracts=show&order=-announced_date_first&size=50",
+      "title": "pdf",
+      "url": "https://arxiv.org/pdf/2512.20666",
+      "source_type": "webpage",
+      "relevance_score": 0.0
+    }
+  ]
+}

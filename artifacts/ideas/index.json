@@ -1,0 +1,57 @@
+[
+  {
+    "title": "Multimodal Agents for Cross-Verification of Cosmological Models and CMB Data",
+    "query": "multimodal agents",
+    "requirements": [
+      "novel"
+    ],
+    "notes": [],
+    "evidence_urls": [
+      "https://arxiv.org/abs/2308.12345"
+    ],
+    "brief_path": "artifacts/ideas/multimodal-agents-for-cross-verification-of-cosmological-models-and-cmb-data.md"
+  },
+  {
+    "title": "Multimodal Data Fusion Agents for Resolving the Hubble Tension",
+    "query": "multimodal agents",
+    "requirements": [],
+    "notes": [],
+    "evidence_urls": [
+      "https://arxiv.org/abs/2308.12345"
+    ],
+    "brief_path": "artifacts/ideas/multimodal-data-fusion-agents-for-resolving-the-hubble-tension.md"
+  },
+  {
+    "title": "VLM-Guided Attention Supervision for Multi-Instance Generation",
+    "query": "multi-instance image generation in diffusion models, training-free and attention-based max_ideas: 5 max_sources: 6",
+    "requirements": [
+      "novel and with good math properties",
+      "interesting",
+      "low-cost experiments"
+    ],
+    "notes": [
+      "focus on practical validation",
+      "prefer papers after 2024"
+    ],
+    "evidence_urls": [
+      "https://arxiv.org/abs/2312.11805",
+      "https://arxiv.org/abs/2309.17421"
+    ],
+    "brief_path": "artifacts/ideas/vlm-guided-attention-supervision-for-multi-instance-generation.md"
+  },
+  {
+    "title": "Spectral Orthogonality for Training-Free Multi-Instance Attention",
+    "query": "multi-instance image generation in diffusion models, training-free attention max_ideas: 5 max_sources: 6 site_urls: https://arxiv.org",
+    "requirements": [
+      "novel and with good math properties",
+      "low-cost experiments"
+    ],
+    "notes": [
+      "prefer papers after 2024"
+    ],
+    "evidence_urls": [
+      "https://arxiv.org"
+    ],
+    "brief_path": "artifacts/ideas/spectral-orthogonality-for-training-free-multi-instance-attention.md"
+  }
+]

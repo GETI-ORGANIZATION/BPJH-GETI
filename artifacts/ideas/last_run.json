@@ -1,0 +1,29 @@
+{
+  "run_id": "20260319-225247-multi-instance-image-generation-in-diffusion-models-training-free-attention",
+  "run_dir": "artifacts/ideas/runs/20260319-225247-multi-instance-image-generation-in-diffusion-models-training-free-attention",
+  "query": "multi-instance image generation in diffusion models, training-free attention",
+  "seed_urls": [
+    "https://arxiv.org/search/?query=multi-instance+image+generation+diffusion+attention&searchtype=all&abstracts=show&order=-announced_date_first&size=50",
+    "https://arxiv.org/abs/2603.10210",
+    "https://arxiv.org/pdf/2603.10210",
+    "https://arxiv.org/abs/2602.08749",
+    "https://arxiv.org/pdf/2602.08749",
+    "https://arxiv.org/abs/2512.20666",
+    "https://arxiv.org/pdf/2512.20666"
+  ],
+  "site_urls": [
+    "https://arxiv.org/search/?query=multi-instance+image+generation+diffusion+attention&searchtype=all&abstracts=show&order=-announced_date_first&size=50"
+  ],
+  "max_sources": 6,
+  "max_ideas": 5,
+  "candidates_json_path": "artifacts/ideas/runs/20260319-225247-multi-instance-image-generation-in-diffusion-models-training-free-attention/idea_candidates.json",
+  "candidates_markdown_path": "artifacts/ideas/runs/20260319-225247-multi-instance-image-generation-in-diffusion-models-training-free-attention/idea_candidates.md",
+  "source_index_markdown_path": "artifacts/ideas/runs/20260319-225247-multi-instance-image-generation-in-diffusion-models-training-free-attention/source_index.md",
+  "crawl_report_markdown_path": "artifacts/ideas/runs/20260319-225247-multi-instance-image-generation-in-diffusion-models-training-free-attention/site_crawl_report.md",
+  "evidence_markdown_path": "artifacts/ideas/runs/20260319-225247-multi-instance-image-generation-in-diffusion-models-training-free-attention/evidence_report.md",
+  "log_path": "artifacts/ideas/runs/20260319-225247-multi-instance-image-generation-in-diffusion-models-training-free-attention/pipeline_log.md",
+  "latest_log_path": "artifacts/ideas/latest_pipeline_log.md",
+  "brief_result": "Built idea brief 'Orthogonal Key-Space Projection for Zero-Shot Multi-Instance Disentanglement'.\nSaved markdown: artifacts/ideas/runs/20260319-225247-multi-instance-image-generation-in-diffusion-models-training-free-attention/orthogonal-key-space-projection-for-zero-shot-multi-instance-disentanglement.md\nIncluded evidence rows: 2",
+  "publish_result": "Published idea brief to Feishu doc.\nTitle: Idea Candidates - multi-instance image generation in diffusion models, trainin\nDocument token: Na9jdnXAYoLlcHxADfoc4V0Lndj\nURL: \nState key: idea-candidates-multi-instance-image-generation-in-diffu",
+  "log_publish_result": "Published idea brief to Feishu doc.\nTitle: Idea Pipeline Log - multi-instance image generation in diffusion models, trainin\nDocument token: GHvBdEQe0oGdOOxijcMckXqFnAf\nURL: \nState key: idea-log-multi-instance-image-generation-in-diffu"
+}

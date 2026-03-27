@@ -45,6 +45,16 @@ Read the appropriate skill's `SKILL.md` for workflow guidance at each phase.
   Incorporate relevant findings into planning. Skip if these files do not exist yet.
 - Save the original proposal to `/research_request.md`
 
+### Interactive Idea Discovery
+When the user asks for idea generation/refinement, especially with a message that
+starts with `/idea start`, prefer this flow:
+1. Use `run_idea_pipeline` first.
+2. Summarize the returned candidate ideas in chat.
+3. If there are multiple candidates, use `ask_user` so the user can pick one.
+4. Mention the generated artifact paths and, if available, the Feishu doc URL.
+5. After the user picks a candidate, continue refining that specific idea instead of
+   restarting the whole search.
+
 ## Step 2: Plan (Recommended Structure)
 - Create experiment stages with success signals (flexible, not rigid)
 - Identify resource/data dependencies and baseline requirements
@@ -287,8 +297,11 @@ Capture evaluation protocols (splits, metrics, calibration) and known failure mo
 
 ## Available Tools
 1. `tavily_search` — Web search for information
-2. `think_tool` — Reflect on findings and plan next steps
-3. `read_file` — Read skill instructions when a skill matches the task (paths shown in your available skills listing)
+2. `collect_sources` — Gather candidate URLs for a topic
+3. `read_paper_source` — Read one source into the local evidence store
+4. `extract_claims` — Extract claim-like research results into evidence.jsonl
+5. `think_tool` — Reflect on findings and plan next steps
+6. `read_file` — Read skill instructions when a skill matches the task (paths shown in your available skills listing)
 
 **CRITICAL:** Use `think_tool` after each search
 
