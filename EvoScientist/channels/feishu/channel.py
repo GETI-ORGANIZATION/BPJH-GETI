@@ -336,7 +336,30 @@ class FeishuChannel(Channel, WebhookMixin, TokenMixin):
         """POST to Feishu API and return True if code==0."""
         try:
             resp = await self._http_client.post(url, json=body, headers=headers)
-            return resp.json().get("code") == 0
+            try:
+                payload = resp.json()
+            except Exception:
+                text = resp.text[:500]
+                logger.warning(
+                    "Feishu send failed: non-JSON response "
+                    f"(status={resp.status_code}, url={url}, body={text!r})"
+                )
+                return False
+
+            if payload.get("code") == 0:
+                return True
+
+            logger.warning(
+                "Feishu send failed: "
+                f"status={resp.status_code}, "
+                f"code={payload.get('code')}, "
+                f"msg={payload.get('msg')!r}, "
+                f"error={payload.get('error')!r}, "
+                f"url={url}, "
+                f"msg_type={body.get('msg_type')!r}, "
+                f"receive_id={body.get('receive_id')!r}"
+            )
+            return False
         except Exception as e:
             logger.warning(f"Feishu send error: {e}")
             return False
