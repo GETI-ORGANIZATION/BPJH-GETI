@@ -294,6 +294,26 @@ def parse_search_request_text(text: str) -> dict[str, Any]:
                 data["query"] = remainder
             continue
 
+        if line.startswith("- ") or line.startswith("* "):
+            item = line[2:].strip()
+            if current_key in ("seed_urls", "site_urls"):
+                cast_list = data[current_key]
+                assert isinstance(cast_list, list)
+                cast_list.extend(_extract_urls(item) or [item])
+            elif current_key == "keywords":
+                cast_list = data[current_key]
+                assert isinstance(cast_list, list)
+                cast_list.extend(_normalize_keywords(item))
+            elif current_key in ("notes",):
+                cast_list = data[current_key]
+                assert isinstance(cast_list, list)
+                cast_list.append(item)
+            elif current_key == "query":
+                data["query"] = f"{data['query']} {item}".strip()
+            elif current_key is not None:
+                data[current_key] = item
+            continue
+
         key_match = re.match(r"^([^:：]+)\s*[:：]\s*(.*)$", line)
         if key_match:
             raw_key = key_match.group(1).strip()
@@ -328,25 +348,7 @@ def parse_search_request_text(text: str) -> dict[str, Any]:
                         assert isinstance(cast_list, list)
                         cast_list.extend(_normalize_text_list(value))
                 continue
-
-        if line.startswith("- ") or line.startswith("* "):
-            item = line[2:].strip()
-            if current_key in ("seed_urls", "site_urls"):
-                cast_list = data[current_key]
-                assert isinstance(cast_list, list)
-                cast_list.extend(_extract_urls(item) or [item])
-            elif current_key == "keywords":
-                cast_list = data[current_key]
-                assert isinstance(cast_list, list)
-                cast_list.extend(_normalize_keywords(item))
-            elif current_key in ("notes",):
-                cast_list = data[current_key]
-                assert isinstance(cast_list, list)
-                cast_list.append(item)
-            elif current_key == "query":
-                data["query"] = f"{data['query']} {item}".strip()
-            elif current_key is not None:
-                data[current_key] = item
+            current_key = None
             continue
 
         if current_key in ("seed_urls", "site_urls"):
@@ -365,18 +367,8 @@ def parse_search_request_text(text: str) -> dict[str, Any]:
             data["query"] = f"{data['query']} {line}".strip()
         elif current_key is not None:
             data[current_key] = line
-        elif not data["query"]:
-            data["query"] = line
         else:
-            cast_list = data["notes"]
-            assert isinstance(cast_list, list)
-            cast_list.append(line)
-
-    if not data["query"]:
-        non_url_text = re.sub(r"https?://[^\s<>\]\)]+", " ", text)
-        non_url_text = re.sub(r"\s+", " ", non_url_text).strip()
-        non_url_text = re.sub(r"^/search\s*", "", non_url_text, flags=re.IGNORECASE).strip()
-        data["query"] = non_url_text
+            continue
 
     sort_value = str(data["sort"]).strip().lower()
     if sort_value not in {"relevance", "newest", "oldest", "title"}:

@@ -54,6 +54,20 @@ def test_parse_delete_request_text_extracts_selector():
     assert payload["normalized_selector"] == "20260404123456"
 
 
+def test_parse_search_request_text_ignores_unknown_fields():
+    payload = parse_search_request_text(
+        "/search\n"
+        "query: agent benchmark\n"
+        "foo: should be ignored\n"
+        "这是一句额外说明，也应该忽略\n"
+        "max_papers: 2\n"
+    )
+
+    assert payload["query"] == "agent benchmark"
+    assert payload["max_papers"] == 2
+    assert payload["notes"] == []
+
+
 def test_run_paper_search_builds_run_dir_and_uploads_files(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
 
