@@ -890,7 +890,10 @@ class Channel(ChannelPlugin, ABC):
         """
         parts = []
         if raw.text:
-            parts.append(raw.text)
+            text = raw.text
+            if raw.is_group and raw.was_mentioned:
+                text = self._strip_mention(text)
+            parts.append(text)
         parts.extend(raw.content_annotations)
         content = "\n".join(p for p in parts if p)
         if not content and not raw.media_files:

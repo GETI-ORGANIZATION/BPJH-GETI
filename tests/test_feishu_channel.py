@@ -12,7 +12,7 @@ from EvoScientist.channels.feishu.channel import (
     _parse_inline_text,
     _parse_inline_elements,
 )
-from EvoScientist.channels.base import ChannelError, OutboundMessage
+from EvoScientist.channels.base import ChannelError, OutboundMessage, RawIncoming
 
 
 from tests.conftest import run_async as _run
@@ -154,6 +154,24 @@ class TestFeishuChannel:
         channel._mention_names = []
         result = channel._strip_mention("hello world")
         assert result == "hello world"
+
+    def test_raw_to_inbound_strips_group_mention_placeholder(self):
+        config = FeishuConfig()
+        channel = FeishuChannel(config)
+        channel._mention_names = ["@_user_1"]
+
+        msg = channel._raw_to_inbound(
+            RawIncoming(
+                sender_id="ou_test",
+                chat_id="oc_test",
+                text="@_user_1 /search\nquery: agent benchmark",
+                is_group=True,
+                was_mentioned=True,
+            )
+        )
+
+        assert msg is not None
+        assert msg.content.startswith("/search")
 
 
 class TestFeishuErrorPatterns:
