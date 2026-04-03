@@ -484,6 +484,16 @@ def _is_idea_start_command(text: str) -> bool:
     return text.strip().lower().startswith("/idea start")
 
 
+def _is_search_command(text: str) -> bool:
+    """Return True when a message should trigger the paper search hard route."""
+    return text.strip().lower().startswith("/search")
+
+
+def _is_paper_delete_command(text: str) -> bool:
+    """Return True when a message should trigger the paper delete hard route."""
+    return text.strip().lower().startswith("/delete")
+
+
 def _load_last_idea_run_state() -> dict[str, Any]:
     path = Path("artifacts") / "ideas" / "last_run.json"
     if not path.exists():
@@ -812,6 +822,40 @@ def _handle_idea_start_command(
     return "\n".join(line for line in response_lines if line is not None)
 
 
+def _handle_search_command(
+    msg: ChannelMessage,
+    *,
+    workspace_dir: str,
+) -> str:
+    """Hard-route `/search` into the paper search workflow."""
+    from ..tools import run_paper_search
+
+    return _run_sync_coro(
+        run_paper_search.ainvoke(
+            {
+                "request_text": msg.content,
+            }
+        )
+    )
+
+
+def _handle_paper_delete_command(
+    msg: ChannelMessage,
+    *,
+    workspace_dir: str,
+) -> str:
+    """Hard-route `/delete` into the paper-search cleanup workflow."""
+    from ..tools.paper_search import delete_paper_search_run
+
+    return _run_sync_coro(
+        delete_paper_search_run.ainvoke(
+            {
+                "request_text": msg.content,
+            }
+        )
+    )
+
+
 def _serve_process_message(
     msg: ChannelMessage,
     *,
@@ -833,6 +877,26 @@ def _serve_process_message(
     console.print(
         f"[dim][{msg.channel_type}] {msg.sender}: {escape(msg.content[:80])}[/dim]"
     )
+
+    if _is_paper_delete_command(msg.content):
+        try:
+            response = _handle_paper_delete_command(msg, workspace_dir=workspace_dir)
+        except Exception as e:
+            response = f"Error: {e}"
+            console.print(f"[red]Paper delete route error: {e}[/red]")
+        _set_channel_response(msg.msg_id, response)
+        console.print(f"[dim][{msg.channel_type}] Replied to {msg.sender}[/dim]")
+        return
+
+    if _is_search_command(msg.content):
+        try:
+            response = _handle_search_command(msg, workspace_dir=workspace_dir)
+        except Exception as e:
+            response = f"Error: {e}"
+            console.print(f"[red]Search route error: {e}[/red]")
+        _set_channel_response(msg.msg_id, response)
+        console.print(f"[dim][{msg.channel_type}] Replied to {msg.sender}[/dim]")
+        return
 
     if _is_idea_start_command(msg.content):
         try:

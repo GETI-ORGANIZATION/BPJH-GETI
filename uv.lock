@@ -823,6 +823,9 @@ dev = [
 discord = [
     { name = "discord-py" },
 ]
+feishu = [
+    { name = "aiohttp" },
+]
 oauth = [
     { name = "ccproxy-api" },
 ]
@@ -852,6 +855,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "aiohttp", marker = "extra == 'all-channels'", specifier = ">=3.9" },
+    { name = "aiohttp", marker = "extra == 'feishu'", specifier = ">=3.9" },
     { name = "aiohttp", marker = "extra == 'slack'", specifier = ">=3.9" },
     { name = "build", marker = "extra == 'dev'", specifier = ">=1.0" },
     { name = "ccproxy-api", marker = "extra == 'oauth'", specifier = ">=0.2.4" },
@@ -891,7 +895,7 @@ requires-dist = [
     { name = "textual", specifier = ">=0.80" },
     { name = "typer", specifier = ">=0.12" },
 ]
-provides-extras = ["dev", "telegram", "discord", "slack", "wechat", "qq", "oauth", "all-channels"]
+provides-extras = ["dev", "telegram", "discord", "slack", "feishu", "wechat", "qq", "oauth", "all-channels"]
 
 [package.metadata.requires-dev]
 dev = [

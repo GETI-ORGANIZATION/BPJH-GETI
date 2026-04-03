@@ -550,6 +550,226 @@ class FeishuIdeaDocClient:
             raise RuntimeError(data.get("msg") or "Failed to fetch Feishu root folder")
         return data["data"]["token"]
 
+    async def _folder_children(self, *, folder_token: str) -> list[dict[str, Any]]:
+        client = await self._ensure_http()
+        children: list[dict[str, Any]] = []
+        page_token = ""
+
+        while True:
+            params: dict[str, Any] = {"page_size": 200}
+            if page_token:
+                params["page_token"] = page_token
+            response = await client.get(
+                f"{self.domain}/open-apis/drive/explorer/v2/folder/{folder_token}/children",
+                headers=await self._headers(),
+                params=params,
+            )
+            payload = response.json()
+            if payload.get("code") != 0:
+                raise RuntimeError(
+                    payload.get("msg")
+                    or f"Failed to list Feishu folder children: {json.dumps(payload, ensure_ascii=False)}"
+                )
+            data = payload.get("data", {})
+            batch = data.get("children") or data.get("items") or data.get("files") or []
+            if isinstance(batch, list):
+                children.extend(batch)
+            if not data.get("has_more"):
+                break
+            page_token = str(data.get("page_token", "") or "")
+            if not page_token:
+                break
+        return children
+
+    def _folder_payload_to_record(self, child: dict[str, Any]) -> dict[str, Any] | None:
+        child_name = str(child.get("name") or child.get("title") or "").strip()
+        child_type = str(
+            child.get("type") or child.get("file_type") or child.get("obj_type") or ""
+        ).lower()
+        if child_type and child_type != "folder":
+            return None
+        token = child.get("token", "") or child.get("folder_token", "") or child.get("node_token", "")
+        if not token:
+            return None
+        return {
+            "token": token,
+            "url": child.get("url", ""),
+            "name": child_name,
+            "created": False,
+        }
+
+    async def list_child_folders(self, *, parent_folder_token: str) -> list[dict[str, Any]]:
+        folders: list[dict[str, Any]] = []
+        for child in await self._folder_children(folder_token=parent_folder_token):
+            folder = self._folder_payload_to_record(child)
+            if folder is not None:
+                folders.append(folder)
+        return folders
+
+    async def find_child_folder(
+        self,
+        *,
+        parent_folder_token: str,
+        name: str,
+    ) -> dict[str, Any] | None:
+        for child in await self.list_child_folders(parent_folder_token=parent_folder_token):
+            if str(child.get("name", "")).strip() == name:
+                return child
+        return None
+
+    async def create_folder(
+        self,
+        *,
+        parent_folder_token: str,
+        name: str,
+    ) -> dict[str, Any]:
+        client = await self._ensure_http()
+        response = await client.post(
+            f"{self.domain}/open-apis/drive/explorer/v2/folder/{parent_folder_token}",
+            headers={**(await self._headers()), "Content-Type": "application/json; charset=utf-8"},
+            json={"name": name},
+        )
+        payload = response.json()
+        if payload.get("code") != 0:
+            raise RuntimeError(
+                payload.get("msg")
+                or f"Failed to create Feishu folder: {json.dumps(payload, ensure_ascii=False)}"
+            )
+        data = payload.get("data", {})
+        return {
+            "token": data.get("token", "") or data.get("folder_token", ""),
+            "url": data.get("url", ""),
+            "revision": data.get("revision"),
+            "name": name,
+        }
+
+    async def ensure_child_folder(
+        self,
+        *,
+        parent_folder_token: str,
+        name: str,
+    ) -> dict[str, Any]:
+        existing = await self.find_child_folder(
+            parent_folder_token=parent_folder_token,
+            name=name,
+        )
+        if existing is not None:
+            return existing
+
+        created = await self.create_folder(parent_folder_token=parent_folder_token, name=name)
+        created["created"] = True
+        return created
+
+    async def upload_drive_file(
+        self,
+        *,
+        file_path: str,
+        parent_folder_token: str,
+    ) -> dict[str, Any]:
+        path = Path(file_path)
+        if not path.exists():
+            raise RuntimeError(f"Local file does not exist: {file_path}")
+
+        client = await self._ensure_http()
+        with path.open("rb") as handle:
+            response = await client.post(
+                f"{self.domain}/open-apis/drive/v1/files/upload_all",
+                headers=await self._headers(),
+                data={
+                    "file_name": path.name,
+                    "parent_type": "explorer",
+                    "parent_node": parent_folder_token,
+                    "size": str(path.stat().st_size),
+                },
+                files={"file": (path.name, handle, "application/octet-stream")},
+            )
+        payload = response.json()
+        if payload.get("code") != 0:
+            raise RuntimeError(
+                payload.get("msg")
+                or f"Failed to upload Feishu drive file: {json.dumps(payload, ensure_ascii=False)}"
+            )
+        data = payload.get("data", {})
+        return {
+            "name": path.name,
+            "file_token": data.get("file_token", "") or data.get("token", ""),
+            "url": data.get("url", ""),
+            "parent_folder_token": parent_folder_token,
+        }
+
+    async def wait_for_drive_task(
+        self,
+        *,
+        task_id: str,
+        timeout_seconds: float = 20.0,
+        poll_interval_seconds: float = 0.5,
+    ) -> str:
+        client = await self._ensure_http()
+        deadline = asyncio.get_running_loop().time() + timeout_seconds
+        last_status = ""
+
+        while True:
+            response = await client.get(
+                f"{self.domain}/open-apis/drive/v1/files/task_check",
+                headers=await self._headers(),
+                params={"task_id": task_id},
+            )
+            payload = response.json()
+            if payload.get("code") != 0:
+                raise RuntimeError(
+                    payload.get("msg")
+                    or f"Failed to check Feishu drive task: {json.dumps(payload, ensure_ascii=False)}"
+                )
+            status = str(payload.get("data", {}).get("status", "") or "").strip().lower()
+            if status:
+                last_status = status
+            if status in {"success", "failed"}:
+                return status
+            if asyncio.get_running_loop().time() >= deadline:
+                raise RuntimeError(
+                    f"Timed out while waiting for Feishu drive task {task_id}. Last status: {last_status or 'unknown'}"
+                )
+            await asyncio.sleep(poll_interval_seconds)
+
+    async def delete_drive_file(
+        self,
+        *,
+        file_token: str,
+        file_type: str = "file",
+        wait_timeout_seconds: float = 20.0,
+    ) -> dict[str, Any]:
+        client = await self._ensure_http()
+        response = await client.delete(
+            f"{self.domain}/open-apis/drive/v1/files/{file_token}",
+            headers=await self._headers(),
+            params={"type": file_type},
+        )
+        payload = response.json()
+        if payload.get("code") != 0:
+            raise RuntimeError(
+                payload.get("msg")
+                or f"Failed to delete Feishu drive file: {json.dumps(payload, ensure_ascii=False)}"
+            )
+
+        task_id = str(payload.get("data", {}).get("task_id", "") or "").strip()
+        status = "success"
+        if task_id:
+            status = await self.wait_for_drive_task(
+                task_id=task_id,
+                timeout_seconds=wait_timeout_seconds,
+            )
+            if status != "success":
+                raise RuntimeError(
+                    f"Feishu drive deletion task did not succeed: {task_id} ({status})"
+                )
+
+        return {
+            "file_token": file_token,
+            "file_type": file_type,
+            "task_id": task_id,
+            "status": status,
+        }
+
     async def _create_document(
         self,
         *,

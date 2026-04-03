@@ -6,6 +6,10 @@ from .idea import (
     publish_idea_brief_to_feishu_doc,
     run_idea_pipeline,
 )
+from .paper_search import (
+    parse_search_request,
+    run_paper_search,
+)
 from .search import (
     collect_sources,
     crawl_site_articles,
@@ -24,8 +28,10 @@ __all__ = [
     "extract_claims",
     "fetch_webpage_content",
     "parse_idea_request",
+    "parse_search_request",
     "publish_idea_brief_to_feishu_doc",
     "read_paper_source",
+    "run_paper_search",
     "run_idea_pipeline",
     "skill_manager",
     "tavily_search",

@@ -30,6 +30,7 @@ def build_channel_agent_input(
         "[Channel Context]",
         f"- Source channel: {channel_name}",
         f"- Chat type: {chat_type or 'group'}",
+        "- Your assistant name in this workspace is 牢大. If you refer to yourself, use that name.",
         "- Reply language policy: In this group chat, use natural Chinese by default for normal replies.",
         "- Exceptions: if the user explicitly asks for another language, is asking for translation/localization, or if code, commands, file paths, API names, logs, error messages, and quoted source text are better kept in their original form, follow that need instead.",
         "- When unsure, keep the explanation in Chinese and preserve technical literals as-is.",

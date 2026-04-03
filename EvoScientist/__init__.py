@@ -36,11 +36,13 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "collect_sources": (".tools", "collect_sources"),
     "extract_claims": (".tools", "extract_claims"),
     "parse_idea_request": (".tools", "parse_idea_request"),
+    "parse_search_request": (".tools", "parse_search_request"),
     "publish_idea_brief_to_feishu_doc": (
         ".tools",
         "publish_idea_brief_to_feishu_doc",
     ),
     "read_paper_source": (".tools", "read_paper_source"),
+    "run_paper_search": (".tools", "run_paper_search"),
     "run_idea_pipeline": (".tools", "run_idea_pipeline"),
     "tavily_search": (".tools", "tavily_search"),
     "think_tool": (".tools", "think_tool"),

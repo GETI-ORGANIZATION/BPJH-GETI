@@ -16,6 +16,7 @@ import io
 import json
 import os
 import re
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal
 from urllib.parse import urlparse
@@ -223,6 +224,73 @@ def _extract_title_from_html(html: str, url: str) -> str:
     return Path(urlparse(url).path).stem or url
 
 
+def _normalize_published_at(value: str | None) -> str | None:
+    """Normalize a best-effort publication date into YYYY-MM-DD."""
+    if not value:
+        return None
+    text = re.sub(r"\s+", " ", value).strip().strip(",")
+    if not text:
+        return None
+
+    direct_match = re.search(r"(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})", text)
+    if direct_match:
+        year, month, day = direct_match.groups()
+        try:
+            return datetime(int(year), int(month), int(day)).strftime("%Y-%m-%d")
+        except ValueError:
+            return None
+
+    for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%Y.%m.%d", "%B %d, %Y", "%b %d, %Y", "%d %B %Y", "%d %b %Y"):
+        try:
+            return datetime.strptime(text, fmt).strftime("%Y-%m-%d")
+        except ValueError:
+            continue
+    return None
+
+
+def _extract_published_at_from_html(html: str) -> str | None:
+    """Extract a best-effort publication date from HTML metadata."""
+    soup = BeautifulSoup(html, "html.parser")
+    meta_candidates = (
+        ("meta", {"name": "citation_publication_date"}),
+        ("meta", {"name": "citation_date"}),
+        ("meta", {"name": "dc.date"}),
+        ("meta", {"name": "dc.date.issued"}),
+        ("meta", {"property": "article:published_time"}),
+        ("meta", {"property": "og:published_time"}),
+        ("meta", {"name": "publish_date"}),
+        ("meta", {"name": "pubdate"}),
+        ("meta", {"itemprop": "datePublished"}),
+        ("time", {"datetime": True}),
+    )
+
+    for tag_name, attrs in meta_candidates:
+        node = soup.find(tag_name, attrs=attrs)
+        if node is None:
+            continue
+        raw_value = node.get("content") or node.get("datetime") or node.get_text(" ", strip=True)
+        published_at = _normalize_published_at(raw_value)
+        if published_at:
+            return published_at
+
+    text = soup.get_text(" ", strip=True)
+    text = re.sub(r"\s+", " ", text)
+    regexes = (
+        r"Submitted on (\d{1,2} [A-Za-z]+ \d{4})",
+        r"Published[:\s]+([A-Za-z]+ \d{1,2}, \d{4})",
+        r"Published[:\s]+(\d{4}[-/.]\d{1,2}[-/.]\d{1,2})",
+        r"(\d{4}[-/.]\d{1,2}[-/.]\d{1,2})",
+    )
+    for pattern in regexes:
+        match = re.search(pattern, text, flags=re.IGNORECASE)
+        if not match:
+            continue
+        published_at = _normalize_published_at(match.group(1))
+        if published_at:
+            return published_at
+    return None
+
+
 def _extract_pdf_text(pdf_bytes: bytes) -> tuple[str, str | None]:
     """Extract text from PDF bytes when an optional parser is available."""
     try:
@@ -260,28 +328,35 @@ async def _fetch_source_content(url: str, timeout: float = 20.0) -> dict[str, An
         response.raise_for_status()
         content_type = response.headers.get("content-type", "")
         source_type = _infer_source_type(url, content_type)
+        final_url = str(response.url)
 
         if source_type == "pdf":
             text, warning = await asyncio.to_thread(_extract_pdf_text, response.content)
-            title = Path(urlparse(url).path).stem or url
+            title = Path(urlparse(final_url).path).stem or final_url
             return {
                 "title": title,
-                "url": url,
+                "url": final_url,
                 "source_type": source_type,
                 "content": text,
                 "warning": warning,
                 "content_type": content_type,
+                "final_url": final_url,
+                "raw_bytes": response.content,
+                "published_at": None,
             }
 
         html = response.text
-        title = _extract_title_from_html(html, url)
+        title = _extract_title_from_html(html, final_url)
         return {
             "title": title,
-            "url": url,
+            "url": final_url,
             "source_type": source_type,
             "content": markdownify(html),
             "warning": None,
             "content_type": content_type,
+            "final_url": final_url,
+            "raw_html": html,
+            "published_at": _extract_published_at_from_html(html),
         }
 
 

@@ -10,6 +10,7 @@ def test_group_chat_input_adds_chinese_reply_policy():
     )
 
     assert "[Channel Context]" in result
+    assert "牢大" in result
     assert "use natural Chinese by default" in result
     assert "Exceptions:" in result
     assert result.endswith("Could you summarize this result?")
