@@ -18,6 +18,7 @@ from dataclasses import dataclass
 from typing import Any, AsyncIterator, Callable, TypeVar
 
 from .base import Channel
+from .agent_input import build_channel_agent_input
 from .bus import MessageBus
 from .bus.events import InboundMessage, OutboundMessage
 
@@ -434,7 +435,12 @@ class InboundConsumer:
         """Stream agent events with HITL interrupt handling."""
         from ..stream.events import stream_agent_events
 
-        stream_input: Any = msg.content
+        stream_input: Any = build_channel_agent_input(
+            msg.content,
+            channel_name=msg.channel,
+            is_group=msg.is_group,
+            metadata=msg.metadata,
+        )
 
         try:
             if channel:

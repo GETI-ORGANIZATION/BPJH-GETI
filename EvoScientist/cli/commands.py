@@ -15,6 +15,7 @@ from rich.table import Table
 
 from rich.markup import escape
 
+from ..channels.agent_input import build_channel_agent_input
 from ..stream.display import console
 from ..paths import ensure_dirs, set_workspace_root
 from ._app import app, config_app, mcp_app, channel_app
@@ -902,7 +903,12 @@ def _serve_process_message(
         response = run_streaming(
             ui_backend="cli",
             agent=agent,
-            message=msg.content,
+            message=build_channel_agent_input(
+                msg.content,
+                channel_name=msg.channel_type,
+                is_group=msg.is_group,
+                metadata=msg.metadata,
+            ),
             thread_id=thread_id,
             show_thinking=show_thinking,
             interactive=True,

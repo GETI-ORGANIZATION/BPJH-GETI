@@ -222,7 +222,7 @@ class TestBusInboundConsumer:
         _run(_test())
 
     def test_channel_message_carries_metadata(self):
-        """ChannelMessage carries metadata, chat_id, and message_id."""
+        """ChannelMessage carries metadata, chat_id, message_id, and group flags."""
         from EvoScientist.cli.channel import (
             _bus_inbound_consumer,
             _message_queue,
@@ -247,6 +247,8 @@ class TestBusInboundConsumer:
                     content="with metadata",
                     metadata={"key": "value"},
                     message_id="msg-123",
+                    is_group=True,
+                    was_mentioned=False,
                 )
             )
 
@@ -260,6 +262,8 @@ class TestBusInboundConsumer:
             assert msg.metadata == {"key": "value"}
             assert msg.chat_id == "chat1"
             assert msg.message_id == "msg-123"
+            assert msg.is_group is True
+            assert msg.was_mentioned is False
             assert msg.channel_ref is ch
 
             _set_channel_response(msg.msg_id, "done")

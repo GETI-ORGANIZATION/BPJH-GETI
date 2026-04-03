@@ -22,6 +22,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
+from ..channels.agent_input import build_channel_agent_input
 from ..stream.display import console
 
 _channel_logger = logging.getLogger(__name__)
@@ -46,6 +47,8 @@ class ChannelMessage:
     bus_ref: Any = None  # MessageBus (for publishing outbound)
     chat_id: str = ""
     message_id: str | None = None
+    is_group: bool = False
+    was_mentioned: bool = True
 
 
 # Thread-safe queue: bus → main
@@ -539,6 +542,8 @@ async def _handle_bus_message(bus, manager, msg) -> None:
         bus_ref=bus,
         chat_id=msg.chat_id,
         message_id=msg.message_id,
+        is_group=msg.is_group,
+        was_mentioned=msg.was_mentioned,
     )
     event = _enqueue_channel_message(cm)
 

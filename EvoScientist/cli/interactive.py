@@ -19,6 +19,7 @@ from rich.markup import escape
 from rich.table import Table
 from rich.text import Text
 
+from ..channels.agent_input import build_channel_agent_input
 from ..sessions import (
     generate_thread_id,
     get_checkpointer,
@@ -607,7 +608,12 @@ def cmd_interactive(
                     response = run_streaming(
                         ui_backend=state["ui_backend"],
                         agent=state["agent"],
-                        message=msg.content,
+                        message=build_channel_agent_input(
+                            msg.content,
+                            channel_name=msg.channel_type,
+                            is_group=msg.is_group,
+                            metadata=msg.metadata,
+                        ),
                         thread_id=state["thread_id"],
                         show_thinking=show_thinking,
                         interactive=True,
