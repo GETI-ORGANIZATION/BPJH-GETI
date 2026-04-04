@@ -155,6 +155,13 @@ class TestFeishuChannel:
         result = channel._strip_mention("hello world")
         assert result == "hello world"
 
+    def test_strip_mention_generic_placeholder_without_cached_mentions(self):
+        config = FeishuConfig()
+        channel = FeishuChannel(config)
+        channel._mention_names = []
+        result = channel._strip_mention("@_user_1 /search hello")
+        assert result == "/search hello"
+
     def test_raw_to_inbound_strips_group_mention_placeholder(self):
         config = FeishuConfig()
         channel = FeishuChannel(config)

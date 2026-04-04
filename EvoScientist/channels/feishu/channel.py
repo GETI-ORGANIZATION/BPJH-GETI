@@ -606,6 +606,9 @@ class FeishuChannel(Channel, WebhookMixin, TokenMixin):
         result = text
         for key in self._mention_names:
             result = result.replace(key, "")
+        # Some Feishu events arrive without a populated mentions array but
+        # still keep the leading placeholder in text content.
+        result = re.sub(r"^(?:@_user_\d+\s*)+", "", result)
         # Clean up extra whitespace left behind
         return re.sub(r"  +", " ", result).strip()
 
@@ -797,6 +800,9 @@ class FeishuChannel(Channel, WebhookMixin, TokenMixin):
                 annotations.append("[sticker message]")
         else:
             text = f"[{msg_type} message]"
+
+        if text:
+            text = self._strip_mention(text)
 
         if not text and not media_paths and not annotations:
             return
