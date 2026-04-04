@@ -193,6 +193,41 @@ def test_feishu_doc_client_markdown_to_paragraphs():
     ]
 
 
+def test_feishu_doc_client_create_folder_uses_title_field():
+    captured: dict[str, object] = {}
+
+    class _FakeResponse:
+        def json(self):
+            return {
+                "code": 0,
+                "data": {
+                    "token": "fld_demo",
+                    "url": "https://feishu.cn/drive/folder/fld_demo",
+                },
+            }
+
+    class _FakeHttpClient:
+        async def post(self, url, headers=None, json=None):
+            captured["url"] = url
+            captured["headers"] = headers
+            captured["json"] = json
+            return _FakeResponse()
+
+    client = FeishuIdeaDocClient(
+        app_id="cli_test",
+        app_secret="secret",
+        http_client=_FakeHttpClient(),
+    )
+    client._token = "tenant_token"
+
+    payload = run_async(
+        client.create_folder(parent_folder_token="fld_parent", name="papers")
+    )
+
+    assert payload["token"] == "fld_demo"
+    assert captured["json"] == {"title": "papers"}
+
+
 def test_run_idea_pipeline_creates_candidates_and_doc(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     publish_payloads: list[dict] = []

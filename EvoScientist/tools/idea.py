@@ -627,7 +627,7 @@ class FeishuIdeaDocClient:
         response = await client.post(
             f"{self.domain}/open-apis/drive/explorer/v2/folder/{parent_folder_token}",
             headers={**(await self._headers()), "Content-Type": "application/json; charset=utf-8"},
-            json={"name": name},
+            json={"title": name},
         )
         payload = response.json()
         if payload.get("code") != 0:
