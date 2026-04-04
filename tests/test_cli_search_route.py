@@ -97,3 +97,47 @@ def test_serve_process_message_hard_routes_delete(monkeypatch, tmp_path):
     )
 
     assert captured["msg-delete-1"] == "delete ok"
+
+
+def test_serve_process_message_hard_routes_update(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+
+    async def _fake_update(payload):
+        assert payload["request_text"].startswith("/update")
+        return "update ok"
+
+    import EvoScientist.tools as tools_mod
+
+    monkeypatch.setattr(tools_mod, "update_command_usage_guide", _FakeAsyncTool(_fake_update))
+
+    def _unexpected_run_streaming(**kwargs):
+        raise AssertionError("run_streaming should not be called for /update")
+
+    monkeypatch.setattr(commands, "run_streaming", _unexpected_run_streaming)
+
+    captured: dict[str, str] = {}
+    monkeypatch.setattr(
+        commands,
+        "_set_channel_response",
+        lambda msg_id, response: captured.setdefault(msg_id, response),
+    )
+
+    msg = ChannelMessage(
+        msg_id="msg-update-1",
+        content="/update fldcn_usage_docs",
+        sender="tester",
+        channel_type="feishu",
+        chat_id="chat-1",
+        metadata={},
+    )
+
+    commands._serve_process_message(
+        msg,
+        agent=object(),
+        thread_id="thread-1",
+        model=None,
+        workspace_dir=str(tmp_path),
+        show_thinking=False,
+    )
+
+    assert captured["msg-update-1"] == "update ok"

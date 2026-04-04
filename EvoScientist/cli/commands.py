@@ -494,6 +494,11 @@ def _is_paper_delete_command(text: str) -> bool:
     return text.strip().lower().startswith("/delete")
 
 
+def _is_update_command(text: str) -> bool:
+    """Return True when a message should trigger the usage-guide update route."""
+    return text.strip().lower().startswith("/update")
+
+
 def _load_last_idea_run_state() -> dict[str, Any]:
     path = Path("artifacts") / "ideas" / "last_run.json"
     if not path.exists():
@@ -856,6 +861,23 @@ def _handle_paper_delete_command(
     )
 
 
+def _handle_update_command(
+    msg: ChannelMessage,
+    *,
+    workspace_dir: str,
+) -> str:
+    """Hard-route `/update` into the Feishu usage-guide refresh workflow."""
+    from ..tools import update_command_usage_guide
+
+    return _run_sync_coro(
+        update_command_usage_guide.ainvoke(
+            {
+                "request_text": msg.content,
+            }
+        )
+    )
+
+
 def _serve_process_message(
     msg: ChannelMessage,
     *,
@@ -877,6 +899,16 @@ def _serve_process_message(
     console.print(
         f"[dim][{msg.channel_type}] {msg.sender}: {escape(msg.content[:80])}[/dim]"
     )
+
+    if _is_update_command(msg.content):
+        try:
+            response = _handle_update_command(msg, workspace_dir=workspace_dir)
+        except Exception as e:
+            response = f"Error: {e}"
+            console.print(f"[red]Usage-guide route error: {e}[/red]")
+        _set_channel_response(msg.msg_id, response)
+        console.print(f"[dim][{msg.channel_type}] Replied to {msg.sender}[/dim]")
+        return
 
     if _is_paper_delete_command(msg.content):
         try:

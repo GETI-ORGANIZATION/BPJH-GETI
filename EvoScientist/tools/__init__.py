@@ -5,6 +5,7 @@ from .idea import (
     parse_idea_request,
     publish_idea_brief_to_feishu_doc,
     run_idea_pipeline,
+    update_command_usage_guide,
 )
 from .paper_search import (
     parse_search_request,
@@ -36,4 +37,5 @@ __all__ = [
     "skill_manager",
     "tavily_search",
     "think_tool",
+    "update_command_usage_guide",
 ]

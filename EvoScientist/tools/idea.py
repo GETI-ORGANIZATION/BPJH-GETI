@@ -23,6 +23,8 @@ DEFAULT_RUNS_DIR = DEFAULT_IDEA_DIR / "runs"
 DEFAULT_DOC_STATE = DEFAULT_IDEA_DIR / "feishu_docs.json"
 DEFAULT_PIPELINE_LOG = DEFAULT_IDEA_DIR / "latest_pipeline_log.md"
 DEFAULT_PIPELINE_RUN_STATE = DEFAULT_IDEA_DIR / "last_run.json"
+DEFAULT_USAGE_GUIDE_DIR = Path("artifacts") / "usage"
+DEFAULT_USAGE_GUIDE_MARKDOWN = DEFAULT_USAGE_GUIDE_DIR / "command_usage.md"
 
 
 def _idea_root() -> Path:
@@ -33,6 +35,12 @@ def _idea_root() -> Path:
 
 def _runs_root() -> Path:
     root = Path.cwd() / DEFAULT_RUNS_DIR
+    root.mkdir(parents=True, exist_ok=True)
+    return root
+
+
+def _usage_guide_root() -> Path:
+    root = Path.cwd() / DEFAULT_USAGE_GUIDE_DIR
     root.mkdir(parents=True, exist_ok=True)
     return root
 
@@ -319,6 +327,326 @@ def parse_idea_request_text(text: str) -> dict[str, Any]:
         "max_sources": max(1, min(_safe_int(str(data["max_sources"]), 4), 12)),
         "raw_text": text.strip(),
     }
+
+
+def parse_update_request_text(text: str) -> dict[str, str]:
+    """Parse a `/update` request into folder-token and title fields."""
+    lines = [line.rstrip() for line in text.splitlines()]
+    data = {
+        "folder_token": "",
+        "title": "牢大使用说明",
+    }
+    current_key: str | None = None
+    key_map = {
+        "folder_token": "folder_token",
+        "token": "folder_token",
+        "title": "title",
+        "标题": "title",
+    }
+
+    for raw_line in lines:
+        line = raw_line.strip()
+        if not line:
+            current_key = None
+            continue
+        if line.lower().startswith("/update"):
+            remainder = line[7:].strip()
+            if remainder:
+                data["folder_token"] = remainder
+            continue
+
+        key_match = re.match(r"^([^:：]+)\s*[:：]\s*(.*)$", line)
+        if key_match:
+            raw_key = key_match.group(1).strip().lower()
+            mapped_key = key_map.get(raw_key)
+            if mapped_key is None:
+                current_key = None
+                continue
+            current_key = mapped_key
+            value = key_match.group(2).strip()
+            if value:
+                data[mapped_key] = value
+            continue
+
+        if current_key in ("folder_token", "title"):
+            data[current_key] = line
+
+    return {
+        "folder_token": str(data["folder_token"]).strip(),
+        "title": str(data["title"]).strip() or "牢大使用说明",
+        "raw_text": text.strip(),
+    }
+
+
+def _hard_route_usage_specs() -> list[dict[str, Any]]:
+    return [
+        {
+            "command": "/idea start",
+            "summary": "运行文献驱动的 idea pipeline，并在群里让用户选择一个候选想法。",
+            "usage": [
+                "/idea start",
+                "query: multimodal agents for scientific discovery",
+                "requirements:",
+                "- novel",
+                "- practical",
+                "seed_urls:",
+                "- https://example.com/paper-a",
+                "site_urls:",
+                "- https://example.com/archive",
+                "max_ideas: 3",
+                "max_sources: 4",
+            ],
+            "parameters": [
+                {
+                    "name": "query",
+                    "required": True,
+                    "format": "单行文本",
+                    "meaning": "研究主题、问题描述或想法目标。",
+                },
+                {
+                    "name": "requirements",
+                    "required": False,
+                    "format": "列表；支持多行 `- item`",
+                    "meaning": "补充约束，例如 novelty、成本、实验条件等。",
+                },
+                {
+                    "name": "seed_urls / urls / seeds",
+                    "required": False,
+                    "format": "列表或单行 URL",
+                    "meaning": "直接指定需要优先参考的论文或网页。",
+                },
+                {
+                    "name": "site_urls / sites",
+                    "required": False,
+                    "format": "列表 URL",
+                    "meaning": "站点递归入口，会先做站内发现，再合并到证据池。",
+                },
+                {
+                    "name": "notes",
+                    "required": False,
+                    "format": "列表或单行文本",
+                    "meaning": "附加说明，会进入 brief 构建上下文。",
+                },
+                {
+                    "name": "max_ideas",
+                    "required": False,
+                    "format": "整数，1-8",
+                    "meaning": "候选 idea 数量上限。",
+                },
+                {
+                    "name": "max_sources",
+                    "required": False,
+                    "format": "整数，1-12",
+                    "meaning": "深读来源数量上限。",
+                },
+            ],
+            "notes": [
+                "执行后会先跑抓取与证据整理，再让群里选择一个候选 idea。",
+                "成功后会继续生成 idea brief，并上传相关文档。",
+            ],
+        },
+        {
+            "command": "/search",
+            "summary": "抓取论文来源、整理结果并上传到飞书 `papers/<调用时间>` 文件夹。",
+            "usage": [
+                "/search",
+                "query: agent benchmark",
+                "keywords:",
+                "- multi-agent",
+                "- benchmark",
+                "date_from: 2023-01-01",
+                "date_to: 2025-12-31",
+                "sort: relevance",
+                "max_papers: 3",
+                "max_results: 8",
+                "site_urls:",
+                "- https://arxiv.org/list/cs.AI/recent",
+                "seed_urls:",
+                "- https://arxiv.org/abs/2308.08155",
+                "max_depth: 1",
+                "max_pages_per_site: 5",
+                "max_articles_per_site: 20",
+            ],
+            "parameters": [
+                {
+                    "name": "query",
+                    "required": True,
+                    "format": "单行文本",
+                    "meaning": "检索主题或论文问题描述。",
+                },
+                {
+                    "name": "keywords",
+                    "required": False,
+                    "format": "列表；支持多行 `- item`",
+                    "meaning": "显式关键词；未提供时会基于 query 自动生成。",
+                },
+                {
+                    "name": "seed_urls",
+                    "required": False,
+                    "format": "列表 URL",
+                    "meaning": "显式给定的论文或网页种子链接。",
+                },
+                {
+                    "name": "site_urls",
+                    "required": False,
+                    "format": "列表 URL",
+                    "meaning": "站点递归起点，用于额外发现候选文章。",
+                },
+                {
+                    "name": "date_from / date_to",
+                    "required": False,
+                    "format": "`YYYY-MM-DD`",
+                    "meaning": "论文发表时间范围筛选。",
+                },
+                {
+                    "name": "sort",
+                    "required": False,
+                    "format": "`relevance | newest | oldest | title`",
+                    "meaning": "最终结果排序方式。",
+                },
+                {
+                    "name": "max_papers",
+                    "required": False,
+                    "format": "整数，1-20",
+                    "meaning": "最终保留并上传的论文数量上限。",
+                },
+                {
+                    "name": "max_results",
+                    "required": False,
+                    "format": "整数，1-30",
+                    "meaning": "候选来源池大小；通常应大于等于 max_papers。",
+                },
+                {
+                    "name": "max_depth",
+                    "required": False,
+                    "format": "整数，0-3",
+                    "meaning": "每个站点的递归深度上限。",
+                },
+                {
+                    "name": "max_pages_per_site",
+                    "required": False,
+                    "format": "整数，1-20",
+                    "meaning": "每个站点最多翻页数量。",
+                },
+                {
+                    "name": "max_articles_per_site",
+                    "required": False,
+                    "format": "整数，1-50",
+                    "meaning": "每个站点最多保留的文章数。",
+                },
+                {
+                    "name": "notes",
+                    "required": False,
+                    "format": "列表或单行文本",
+                    "meaning": "附加说明字段，目前主要用于保留备注。",
+                },
+            ],
+            "notes": [
+                "本地只记录一次元数据，不长期保存整批抓取文件。",
+                "未知字段会被直接忽略，不会自动并入 query。",
+            ],
+        },
+        {
+            "command": "/delete",
+            "summary": "删除一次 `/search` 的本地元数据，并删除对应的飞书文件夹。",
+            "usage": [
+                "/delete 20260404-123456",
+            ],
+            "parameters": [
+                {
+                    "name": "时间选择器",
+                    "required": True,
+                    "format": "完整时间或前缀，例如 `20260404-123456`",
+                    "meaning": "匹配一次 `/search` 调用记录。",
+                },
+            ],
+            "notes": [
+                "如果命中多条记录，机器人会要求给出更具体的时间。",
+                "删除远端文件夹前需要飞书凭据仍然有效。",
+            ],
+        },
+        {
+            "command": "/update",
+            "summary": "在指定 folder token 下刷新当前这份使用说明文档。",
+            "usage": [
+                "/update fldcnxxxxxxxxxxxx",
+                "/update",
+                "folder_token: fldcnxxxxxxxxxxxx",
+                "title: 牢大使用说明",
+            ],
+            "parameters": [
+                {
+                    "name": "folder_token / token",
+                    "required": True,
+                    "format": "飞书 folder token",
+                    "meaning": "说明文档要写入的目标文件夹。",
+                },
+                {
+                    "name": "title",
+                    "required": False,
+                    "format": "单行文本",
+                    "meaning": "说明文档标题；默认是 `牢大使用说明`。",
+                },
+            ],
+            "notes": [
+                "重复调用会刷新同一个逻辑记录，并尝试删除旧版说明文档。",
+                "如果没有显式提供 folder token，会退回配置里的 `feishu_doc_folder_token`。",
+            ],
+        },
+    ]
+
+
+def _render_command_usage_markdown(*, title: str, folder_token: str) -> str:
+    lines = [
+        f"# {title}",
+        "",
+        "- 机器人名称: 牢大",
+        f"- 更新时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+        f"- 目标 Folder Token: {folder_token}",
+        "- 维护方式: 本文档由 `/update` 命令自动刷新。",
+        "",
+        "## 当前硬路由命令总览",
+    ]
+    specs = _hard_route_usage_specs()
+    for spec in specs:
+        lines.append(f"- `{spec['command']}`: {spec['summary']}")
+
+    for spec in specs:
+        lines.extend(
+            [
+                "",
+                f"## {spec['command']}",
+                f"- 功能: {spec['summary']}",
+                "",
+                "### 触发格式",
+            ]
+        )
+        for item in spec["usage"]:
+            lines.append(f"- `{item}`")
+        lines.extend(["", "### 参数说明"])
+        for param in spec["parameters"]:
+            required_text = "必填" if param["required"] else "可选"
+            lines.append(
+                f"- `{param['name']}`: {required_text}；格式 {param['format']}；{param['meaning']}"
+            )
+        if spec.get("notes"):
+            lines.extend(["", "### 补充说明"])
+            for note in spec["notes"]:
+                lines.append(f"- {note}")
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def _command_usage_record_key(folder_token: str) -> str:
+    return f"command-usage-{hashlib.sha1(folder_token.encode('utf-8')).hexdigest()[:12]}"
+
+
+def _write_command_usage_markdown(*, title: str, folder_token: str) -> Path:
+    path = _usage_guide_root() / DEFAULT_USAGE_GUIDE_MARKDOWN.name
+    path.write_text(
+        _render_command_usage_markdown(title=title, folder_token=folder_token),
+        encoding="utf-8",
+    )
+    return path
 
 
 def _idea_evidence_matches(record: dict[str, Any], query_terms: list[str], url_set: set[str]) -> tuple[int, float]:
@@ -1204,6 +1532,92 @@ async def publish_idea_brief_to_feishu_doc(
 
 
 @tool(parse_docstring=True)
+async def update_command_usage_guide(request_text: str) -> str:
+    """Refresh the hard-route usage guide under a target Feishu folder.
+
+    Args:
+        request_text: User message containing `/update`, `folder_token`, and optional `title`
+
+    Returns:
+        Short update summary including the local markdown path and doc metadata
+    """
+    parsed = parse_update_request_text(request_text)
+    cfg = get_effective_config()
+    target_folder = parsed["folder_token"] or getattr(cfg, "feishu_doc_folder_token", "").strip()
+    if not target_folder:
+        return (
+            "牢大还需要一个 folder token。\n"
+            "用法：/update fldcnxxxxxxxxxxxx\n"
+            "或\n"
+            "/update\n"
+            "folder_token: fldcnxxxxxxxxxxxx"
+        )
+    if not cfg.feishu_app_id or not cfg.feishu_app_secret:
+        return (
+            "牢大还缺少飞书凭据。\n"
+            "请先配置 feishu_app_id 和 feishu_app_secret。"
+        )
+
+    doc_title = parsed["title"] or "牢大使用说明"
+    markdown_path = _write_command_usage_markdown(title=doc_title, folder_token=target_folder)
+    logical_key = _command_usage_record_key(target_folder)
+    state = _load_doc_state()
+    previous = state.get(logical_key, {}) if isinstance(state.get(logical_key), dict) else {}
+    previous_token = str(previous.get("document_token", "") or "").strip()
+    delete_warning = ""
+
+    client = FeishuIdeaDocClient(
+        app_id=cfg.feishu_app_id,
+        app_secret=cfg.feishu_app_secret,
+        domain=cfg.feishu_domain,
+    )
+    try:
+        if previous_token:
+            try:
+                await client.delete_drive_file(file_token=previous_token, file_type="docx")
+            except Exception as exc:
+                delete_warning = str(exc)
+        result = await client.publish_markdown_doc(
+            title=doc_title,
+            markdown_content=markdown_path.read_text(encoding="utf-8"),
+            folder_token=target_folder,
+        )
+    except Exception as exc:
+        return (
+            "牢大更新使用说明文档失败。\n"
+            f"原因: {exc}\n"
+            f"本地 Markdown: {_display_path(markdown_path)}"
+        )
+    finally:
+        await client.aclose()
+
+    state[logical_key] = {
+        "kind": "command_usage_guide",
+        "title": doc_title,
+        "markdown_path": _display_path(markdown_path),
+        "document_token": result.get("document_token", ""),
+        "url": result.get("url", ""),
+        "folder_token": result.get("folder_token", "") or target_folder,
+        "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    }
+    _save_doc_state(state)
+
+    response_lines = [
+        "牢大已更新使用说明文档。",
+        f"标题: {doc_title}",
+        f"目标 Folder Token: {target_folder}",
+        f"本地 Markdown: {_display_path(markdown_path)}",
+        f"Document token: {result.get('document_token', '')}",
+    ]
+    if result.get("url"):
+        response_lines.append(f"URL: {result.get('url', '')}")
+    if delete_warning:
+        response_lines.append(f"旧版文档删除告警: {delete_warning}")
+    response_lines.append("已写入命令: /idea start, /search, /delete, /update")
+    return "\n".join(response_lines)
+
+
+@tool(parse_docstring=True)
 async def run_idea_pipeline(
     request_text: str,
     max_sources: int = 4,
@@ -1475,6 +1889,8 @@ __all__ = [
     "build_idea_brief",
     "parse_idea_request",
     "parse_idea_request_text",
+    "parse_update_request_text",
     "publish_idea_brief_to_feishu_doc",
     "run_idea_pipeline",
+    "update_command_usage_guide",
 ]
