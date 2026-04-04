@@ -154,48 +154,36 @@ def _build_base_kwargs(base_backend, base_middleware):
     """Build agent kwargs *without* MCP (fast, no subprocess spawning)."""
     from .utils import load_subagents
     from .tools import (
-        build_idea_brief,
         collect_sources,
         crawl_site_articles,
         extract_claims,
-        parse_idea_request,
         parse_search_request,
-        publish_idea_brief_to_feishu_doc,
         read_paper_source,
         run_paper_search,
-        run_idea_pipeline,
         skill_manager,
         tavily_search,
         think_tool,
     )
 
     tool_registry = {
-        "build_idea_brief": build_idea_brief,
         "collect_sources": collect_sources,
         "crawl_site_articles": crawl_site_articles,
         "extract_claims": extract_claims,
-        "parse_idea_request": parse_idea_request,
         "parse_search_request": parse_search_request,
-        "publish_idea_brief_to_feishu_doc": publish_idea_brief_to_feishu_doc,
         "read_paper_source": read_paper_source,
         "run_paper_search": run_paper_search,
-        "run_idea_pipeline": run_idea_pipeline,
         "think_tool": think_tool,
         "tavily_search": tavily_search,
     }
     base_tools = [
         think_tool,
         skill_manager,
-        parse_idea_request,
         parse_search_request,
-        run_idea_pipeline,
         run_paper_search,
         collect_sources,
         crawl_site_articles,
         read_paper_source,
         extract_claims,
-        build_idea_brief,
-        publish_idea_brief_to_feishu_doc,
     ]
 
     subs = load_subagents(
@@ -224,16 +212,12 @@ def load_mcp_and_build_kwargs(base_backend, base_middleware):
     """
     from .utils import load_subagents
     from .tools import (
-        build_idea_brief,
         collect_sources,
         crawl_site_articles,
         extract_claims,
-        parse_idea_request,
         parse_search_request,
-        publish_idea_brief_to_feishu_doc,
         read_paper_source,
         run_paper_search,
-        run_idea_pipeline,
         skill_manager,
         tavily_search,
         think_tool,
@@ -244,32 +228,24 @@ def load_mcp_and_build_kwargs(base_backend, base_middleware):
         return _build_base_kwargs(base_backend, base_middleware)
 
     tool_registry = {
-        "build_idea_brief": build_idea_brief,
         "collect_sources": collect_sources,
         "crawl_site_articles": crawl_site_articles,
         "extract_claims": extract_claims,
-        "parse_idea_request": parse_idea_request,
         "parse_search_request": parse_search_request,
-        "publish_idea_brief_to_feishu_doc": publish_idea_brief_to_feishu_doc,
         "read_paper_source": read_paper_source,
         "run_paper_search": run_paper_search,
-        "run_idea_pipeline": run_idea_pipeline,
         "think_tool": think_tool,
         "tavily_search": tavily_search,
     }
     base_tools = [
         think_tool,
         skill_manager,
-        parse_idea_request,
         parse_search_request,
-        run_idea_pipeline,
         run_paper_search,
         collect_sources,
         crawl_site_articles,
         read_paper_source,
         extract_claims,
-        build_idea_brief,
-        publish_idea_brief_to_feishu_doc,
     ]
 
     # Fresh tool registry — start from base tools + MCP tools
